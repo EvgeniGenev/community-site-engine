@@ -1,8 +1,9 @@
 # AWS Deployment Runbook
 
-Use `infra/production.yml` to create a production deployment with one required parameter:
+Use `infra/production.yml` to create a production deployment with two required parameters:
 
 - `SiteName`: short lowercase site name, for example `bhcaz`.
+- `AdminEmail`: email address for the first Cognito admin user.
 
 Optional parameter:
 
@@ -22,7 +23,7 @@ The stack creates resources in this order:
 2. Private S3 public-site origin bucket.
 3. Private S3 Admin app origin bucket.
 4. CloudFront origin access controls, distributions, and bucket policies.
-5. Cognito user pool and app client.
+5. Cognito user pool, app client, hosted UI domain, and initial admin user.
 6. Placeholder CMS API Lambda and HTTP API Gateway.
 7. Optional asset seeder for `AssetsZipS3Uri`.
 8. CodeBuild project.
@@ -35,6 +36,8 @@ https://github.com/EvgeniGenev/community-site-engine.git
 ```
 
 The repository must be publicly readable, or CodeBuild must be configured in your AWS account with GitHub access before deployment.
+
+The initial admin user receives a Cognito invitation email with a temporary password. Use that account to sign in to the Admin app after the initial CodeBuild deployment finishes.
 
 ## Optional BHCAZ Asset Zip
 
@@ -70,7 +73,7 @@ aws cloudformation deploy `
   --stack-name bhcaz-prod `
   --template-file infra/production.yml `
   --capabilities CAPABILITY_NAMED_IAM `
-  --parameter-overrides SiteName=bhcaz
+  --parameter-overrides SiteName=bhcaz AdminEmail=admin@example.com
 ```
 
 Deployment with private asset zip:
@@ -82,6 +85,7 @@ aws cloudformation deploy `
   --capabilities CAPABILITY_NAMED_IAM `
   --parameter-overrides `
     SiteName=bhcaz `
+    AdminEmail=admin@example.com `
     AssetsZipS3Uri=s3://bhcaz-deployment-artifacts-ACCOUNT-REGION/bhcaz-assets.zip
 ```
 
@@ -101,6 +105,7 @@ Important outputs:
 - `CmsContentBucket`
 - `CognitoUserPoolId`
 - `CognitoAppClientId`
+- `CognitoHostedUiDomain`
 - `CodeBuildProjectName`
 
 The CloudFormation stack starts the initial CodeBuild deployment but does not wait for the full build to finish. After stack creation completes, check the CodeBuild build status before opening the public site or Admin app.
@@ -109,26 +114,13 @@ The CloudFormation stack starts the initial CodeBuild deployment but does not wa
 aws codebuild list-builds-for-project --project-name CODEBUILD_PROJECT_NAME_FROM_OUTPUT
 ```
 
-## Create Initial Admin User
+## Initial Admin User
 
-Create a Cognito user and assign the CMS role:
+CloudFormation creates the first Cognito admin user from `AdminEmail` and assigns `custom:role=admin`.
 
-```powershell
-aws cognito-idp admin-create-user `
-  --user-pool-id COGNITO_USER_POOL_ID_FROM_OUTPUT `
-  --username admin@example.com `
-  --user-attributes Name=email,Value=admin@example.com Name=email_verified,Value=true Name=name,Value="Admin" Name=custom:role,Value=admin
-```
+Cognito sends that user an invitation email with a temporary password. On first sign-in, Cognito will require the password to be changed.
 
-Set a permanent password:
-
-```powershell
-aws cognito-idp admin-set-user-password `
-  --user-pool-id COGNITO_USER_POOL_ID_FROM_OUTPUT `
-  --username admin@example.com `
-  --password "REPLACE_WITH_STRONG_PASSWORD" `
-  --permanent
-```
+To add more users later, sign in to Admin and use the Users screen.
 
 ## Ongoing Code Changes
 

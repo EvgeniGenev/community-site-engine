@@ -263,6 +263,76 @@ function apiBase() {
   return import.meta.env.VITE_CMS_API_URL ?? "http://localhost:8787";
 }
 
+function cognitoConfig() {
+  const domain = import.meta.env.VITE_COGNITO_DOMAIN as string | undefined;
+  const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID as string | undefined;
+  const redirectUri = (import.meta.env.VITE_COGNITO_REDIRECT_URI as string | undefined) || window.location.origin;
+  return domain && clientId ? { domain: domain.replace(/\/$/, ""), clientId, redirectUri } : null;
+}
+
+function base64UrlEncode(bytes: Uint8Array) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function sha256(value: string) {
+  const data = new TextEncoder().encode(value);
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+}
+
+function randomBase64Url(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+}
+
+async function startCognitoLogin() {
+  const config = cognitoConfig();
+  if (!config) return;
+  const verifier = randomBase64Url(64);
+  const state = randomBase64Url(32);
+  sessionStorage.setItem("community-site-engine-pkce-verifier", verifier);
+  sessionStorage.setItem("community-site-engine-oauth-state", state);
+  const challenge = base64UrlEncode(await sha256(verifier));
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    redirect_uri: config.redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    state
+  });
+  window.location.assign(`${config.domain}/oauth2/authorize?${params.toString()}`);
+}
+
+async function exchangeCognitoCode(code: string) {
+  const config = cognitoConfig();
+  const verifier = sessionStorage.getItem("community-site-engine-pkce-verifier");
+  if (!config || !verifier) throw new Error("Missing Cognito login session. Please sign in again.");
+  const response = await fetch(`${config.domain}/oauth2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      code,
+      code_verifier: verifier,
+      grant_type: "authorization_code",
+      redirect_uri: config.redirectUri
+    })
+  });
+  const result = await response.json() as { id_token?: string; error?: string; error_description?: string };
+  if (!response.ok || !result.id_token) {
+    throw new Error(result.error_description ?? result.error ?? "Cognito token exchange failed");
+  }
+  sessionStorage.removeItem("community-site-engine-pkce-verifier");
+  sessionStorage.removeItem("community-site-engine-oauth-state");
+  return result.id_token;
+}
+
 function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
@@ -582,6 +652,7 @@ function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; upda
 function App() {
   const [token, setToken] = useState(localStorage.getItem("community-site-engine-token") ?? (import.meta.env.DEV ? "dev-admin-token" : ""));
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("pages");
   const [locale, setLocale] = useState("en");
   const [message, setMessage] = useState("");
@@ -623,18 +694,19 @@ function App() {
 
   const role = user?.role;
   const structureAllowed = canStructure(role);
+  const hasCognitoLogin = Boolean(cognitoConfig());
 
-  async function refresh() {
+  async function refresh(activeToken = token) {
     try {
-      const me = await request<UserInfo>(token, "/api/me");
+      const me = await request<UserInfo>(activeToken, "/api/me");
       setUser(me);
       const [loadedPages, loadedEvents, loadedArticles, loadedGallery, loadedSettings, loadedNavigation] = await Promise.all([
-        request<CmsObject<Page>[]>(token, `/api/list/pages?locale=${locale}`),
-        request<CmsObject<EventItem>[]>(token, "/api/list/events"),
-        request<CmsObject<Article>[]>(token, `/api/list/articles?locale=${locale}`),
-        request<CmsObject<MediaRef[]>[]>(token, "/api/list/gallery"),
-        request<CmsObject<SiteSettings>[]>(token, "/api/list/settings"),
-        request<CmsObject<Navigation>[]>(token, `/api/list/navigation?locale=${locale}`)
+        request<CmsObject<Page>[]>(activeToken, `/api/list/pages?locale=${locale}`),
+        request<CmsObject<EventItem>[]>(activeToken, "/api/list/events"),
+        request<CmsObject<Article>[]>(activeToken, `/api/list/articles?locale=${locale}`),
+        request<CmsObject<MediaRef[]>[]>(activeToken, "/api/list/gallery"),
+        request<CmsObject<SiteSettings>[]>(activeToken, "/api/list/settings"),
+        request<CmsObject<Navigation>[]>(activeToken, `/api/list/navigation?locale=${locale}`)
       ]);
       setPages(loadedPages);
       setEvents(loadedEvents);
@@ -655,9 +727,53 @@ function App() {
     }
   }
 
+  async function handleCognitoCallback() {
+    const config = cognitoConfig();
+    if (!config) return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    const expectedState = sessionStorage.getItem("community-site-engine-oauth-state");
+    if (!code) return;
+    setAuthBusy(true);
+    try {
+      if (!state || state !== expectedState) throw new Error("Cognito login state did not match. Please sign in again.");
+      const idToken = await exchangeCognitoCode(code);
+      setToken(idToken);
+      localStorage.setItem("community-site-engine-token", idToken);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      await refresh(idToken);
+    } catch (error) {
+      setUser(null);
+      setMessage(`Cognito login failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  function signOut() {
+    const config = cognitoConfig();
+    localStorage.removeItem("community-site-engine-token");
+    sessionStorage.removeItem("community-site-engine-pkce-verifier");
+    sessionStorage.removeItem("community-site-engine-oauth-state");
+    setToken("");
+    setUser(null);
+    if (config) {
+      const params = new URLSearchParams({
+        client_id: config.clientId,
+        logout_uri: config.redirectUri
+      });
+      window.location.assign(`${config.domain}/logout?${params.toString()}`);
+    }
+  }
+
   useEffect(() => {
     localStorage.setItem("community-site-engine-token", token);
   }, [token]);
+
+  useEffect(() => {
+    void handleCognitoCallback();
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -1241,11 +1357,28 @@ function App() {
         <section className="loginCard">
           <p className="kicker">Community Site Engine</p>
           <h1>Admin Login</h1>
-          <label>
-            Access token
-            <input value={token} onChange={(event) => setToken(event.target.value)} />
-          </label>
-          <button onClick={refresh}>Sign In</button>
+          {hasCognitoLogin ? (
+            <>
+              <p className="muted">Sign in with the site administrator account.</p>
+              <button onClick={() => void startCognitoLogin()} disabled={authBusy}>{authBusy ? "Signing in..." : "Sign in with Cognito"}</button>
+              <details>
+                <summary>Use bearer token manually</summary>
+                <label>
+                  Access token
+                  <input value={token} onChange={(event) => setToken(event.target.value)} />
+                </label>
+                <button onClick={() => void refresh()}>Use Token</button>
+              </details>
+            </>
+          ) : (
+            <>
+              <label>
+                Access token
+                <input value={token} onChange={(event) => setToken(event.target.value)} />
+              </label>
+              <button onClick={() => void refresh()}>Sign In</button>
+            </>
+          )}
           <p className="status">{message}</p>
         </section>
       </main>
@@ -1261,7 +1394,8 @@ function App() {
           Access token
           <input value={token} onChange={(event) => setToken(event.target.value)} />
         </label>
-        <button onClick={refresh}>Sign In / Refresh</button>
+        <button onClick={() => void refresh()}>Sign In / Refresh</button>
+        <button className="ghost" onClick={signOut}>Sign Out</button>
         <p className="status">{message}</p>
         <div className="roleBox">
           <strong>{user?.name ?? "Not signed in"}</strong>

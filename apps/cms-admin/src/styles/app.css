@@ -60,6 +60,15 @@ button.danger:hover {
   background: #000;
 }
 
+button.ghost {
+  border: 1px solid rgba(255, 255, 255, .34);
+  background: transparent;
+}
+
+button.ghost:hover {
+  background: rgba(255, 255, 255, .12);
+}
+
 input,
 select,
 textarea {
@@ -96,6 +105,16 @@ textarea {
   border-radius: 28px;
   background: rgba(255, 255, 255, .94);
   box-shadow: 0 24px 70px rgba(35, 31, 32, .14);
+}
+
+.loginCard details {
+  margin-top: 18px;
+}
+
+.loginCard summary {
+  cursor: pointer;
+  color: var(--red);
+  font-weight: 700;
 }
 
 .sidebar,

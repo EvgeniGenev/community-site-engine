@@ -8,12 +8,15 @@ Metadata:
           default: Site
         Parameters:
           - SiteName
+          - AdminEmail
           - AssetsZipS3Uri
     ParameterLabels:
       SiteName:
         default: Site name
       AssetsZipS3Uri:
         default: Optional assets zip S3 URI
+      AdminEmail:
+        default: Initial admin email
 
 Parameters:
   SiteName:
@@ -29,6 +32,11 @@ Parameters:
     Description: Optional s3://bucket/key.zip containing site content/assets. The zip may contain content/... or site-assets/content/... paths.
     AllowedPattern: "^$|^s3://[^/]+/.+\\.zip$"
     ConstraintDescription: Leave blank or provide an s3://bucket/key.zip URI.
+  AdminEmail:
+    Type: String
+    Description: Email address for the first Cognito admin user. Cognito sends this user a temporary password.
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    ConstraintDescription: Provide a valid email address.
 
 Conditions:
   HasAssetsZip: !Not [!Equals [!Ref AssetsZipS3Uri, ""]]
@@ -262,6 +270,115 @@ Resources:
         - email
         - openid
         - profile
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub ${SiteName}-auth-${AWS::Region}-${AWS::AccountId}
+      UserPoolId: !Ref UserPool
+
+  InitialAdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SiteName}-initial-admin-role-${AWS::Region}-${AWS::AccountId}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub ${SiteName}-initial-admin-access-${AWS::Region}-${AWS::AccountId}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminUpdateUserAttributes
+                Resource: !GetAtt UserPool.Arn
+
+  InitialAdminFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${SiteName}-initial-admin-${AWS::Region}-${AWS::AccountId}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt InitialAdminRole.Arn
+      Timeout: 120
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import urllib.request
+
+          cognito = boto3.client("cognito-idp")
+
+          def respond(event, context, status, data=None, reason=None):
+              body = {
+                  "Status": status,
+                  "Reason": reason or f"See CloudWatch Log Stream: {context.log_stream_name}",
+                  "PhysicalResourceId": event.get("PhysicalResourceId") or f"initial-admin-{event['ResourceProperties']['AdminEmail']}",
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+                  "NoEcho": False,
+                  "Data": data or {},
+              }
+              payload = json.dumps(body).encode("utf-8")
+              req = urllib.request.Request(event["ResponseURL"], data=payload, method="PUT")
+              req.add_header("content-type", "")
+              req.add_header("content-length", str(len(payload)))
+              urllib.request.urlopen(req, timeout=30)
+
+          def upsert_admin(user_pool_id, email):
+              attributes = [
+                  {"Name": "email", "Value": email},
+                  {"Name": "email_verified", "Value": "true"},
+                  {"Name": "name", "Value": "Initial Admin"},
+                  {"Name": "custom:role", "Value": "admin"},
+              ]
+              try:
+                  cognito.admin_create_user(
+                      UserPoolId=user_pool_id,
+                      Username=email,
+                      UserAttributes=attributes,
+                      DesiredDeliveryMediums=["EMAIL"],
+                  )
+                  return "created"
+              except cognito.exceptions.UsernameExistsException:
+                  cognito.admin_update_user_attributes(
+                      UserPoolId=user_pool_id,
+                      Username=email,
+                      UserAttributes=attributes,
+                  )
+                  return "updated"
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] == "Delete":
+                      respond(event, context, "SUCCESS", {"Skipped": "Delete does not remove Cognito users"})
+                      return
+                  props = event["ResourceProperties"]
+                  status = upsert_admin(props["UserPoolId"], props["AdminEmail"])
+                  respond(event, context, "SUCCESS", {"AdminEmail": props["AdminEmail"], "Status": status})
+              except Exception as exc:
+                  respond(event, context, "FAILED", reason=str(exc))
+
+  InitialAdminUser:
+    Type: Custom::InitialAdminUser
+    DependsOn:
+      - UserPool
+      - InitialAdminFunction
+    Properties:
+      ServiceToken: !GetAtt InitialAdminFunction.Arn
+      UserPoolId: !Ref UserPool
+      AdminEmail: !Ref AdminEmail
 
   ApiLambdaRole:
     Type: AWS::IAM::Role
@@ -588,6 +705,15 @@ Resources:
           - Name: CMS_API_ENDPOINT
             Type: PLAINTEXT
             Value: !GetAtt HttpApi.ApiEndpoint
+          - Name: COGNITO_DOMAIN
+            Type: PLAINTEXT
+            Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
+          - Name: COGNITO_CLIENT_ID
+            Type: PLAINTEXT
+            Value: !Ref UserPoolClient
+          - Name: ADMIN_ORIGIN
+            Type: PLAINTEXT
+            Value: !Sub https://${AdminDistribution.DomainName}
       Source:
         Type: NO_SOURCE
         BuildSpec: |
@@ -639,7 +765,7 @@ Resources:
                   fi
                 - aws s3 sync "s3://$CMS_CONTENT_BUCKET/" site-assets/content --delete
                 - npm run seed:media
-                - VITE_CMS_API_URL="$CMS_API_ENDPOINT" npm --workspace apps/cms-admin run build
+                - VITE_CMS_API_URL="$CMS_API_ENDPOINT" VITE_COGNITO_DOMAIN="$COGNITO_DOMAIN" VITE_COGNITO_CLIENT_ID="$COGNITO_CLIENT_ID" VITE_COGNITO_REDIRECT_URI="$ADMIN_ORIGIN" npm --workspace apps/cms-admin run build
                 - aws s3 sync apps/cms-admin/dist "s3://$ADMIN_SITE_BUCKET/" --delete
                 - npm run build:site
                 - aws s3 sync apps/site/dist "s3://$PUBLIC_SITE_BUCKET/" --delete
@@ -726,6 +852,7 @@ Resources:
     Type: Custom::InitialDeployment
     DependsOn:
       - AssetSeed
+      - InitialAdminUser
       - StaticSiteBuildProject
       - HttpApiStage
     Properties:
@@ -751,5 +878,7 @@ Outputs:
     Value: !Ref UserPool
   CognitoAppClientId:
     Value: !Ref UserPoolClient
+  CognitoHostedUiDomain:
+    Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
   CodeBuildProjectName:
     Value: !Ref StaticSiteBuildProject
