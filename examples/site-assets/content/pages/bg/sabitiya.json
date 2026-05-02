@@ -1,0 +1,26 @@
+{
+  "id": "events",
+  "locale": "bg",
+  "status": "published",
+  "title": "Събития",
+  "slug": "sabitiya",
+  "translationKey": "events",
+  "seo": {
+    "title": "Събития",
+    "description": "Събития - примерна страница за общностен сайт."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Събития",
+      "body": "Разгледайте предстоящи и минали примерни събития.",
+      "actions": []
+    },
+    {
+      "type": "eventList",
+      "title": "Общностен календар",
+      "intro": "Публикуваните събития се показват тук.",
+      "eventIds": []
+    }
+  ]
+}

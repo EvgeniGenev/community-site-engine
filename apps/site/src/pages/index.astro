@@ -1,0 +1,16 @@
+---
+import Blocks from "../components/Blocks.astro";
+import Layout from "../components/Layout.astro";
+import { getArticles, getGallery, getLocalizedEvents, getNavigation, getPage, getSettings } from "../content";
+
+const page = await getPage("en", "");
+if (!page) throw new Error("English home page missing");
+const settings = await getSettings();
+const navigation = await getNavigation("en");
+const events = await getLocalizedEvents("en");
+const articles = await getArticles("en");
+const galleryItems = await getGallery("en");
+---
+<Layout page={page} settings={settings} navigation={navigation}>
+  <Blocks blocks={page.blocks} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} />
+</Layout>

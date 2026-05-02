@@ -1,0 +1,25 @@
+{
+  "id": "donations",
+  "locale": "en",
+  "status": "published",
+  "title": "Donations",
+  "slug": "donations",
+  "translationKey": "donations",
+  "seo": {
+    "title": "Donations",
+    "description": "Sample donation page."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Support the work",
+      "body": "Use this page to explain how donations, in-kind support, and sponsorships help your community programs.",
+      "actions": []
+    },
+    {
+      "type": "richText",
+      "title": "Sample giving note",
+      "body": "Replace this sample copy with your donation policy, eligible donation methods, and any required nonprofit disclosures."
+    }
+  ]
+}

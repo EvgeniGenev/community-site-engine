@@ -1,0 +1,62 @@
+{
+  "locale": "en",
+  "items": [
+    {
+      "label": "Events",
+      "href": "/events/",
+      "children": []
+    },
+    {
+      "label": "News & Articles",
+      "href": "/news-articles/",
+      "children": []
+    },
+    {
+      "label": "Gallery",
+      "href": "/gallery/",
+      "children": []
+    },
+    {
+      "label": "About",
+      "href": "/about-us/",
+      "children": [
+        {
+          "label": "Mission and Values",
+          "href": "/mission-and-values/",
+          "children": []
+        },
+        {
+          "label": "Projects",
+          "href": "/projects/",
+          "children": []
+        },
+        {
+          "label": "Volunteers",
+          "href": "/volunteers/",
+          "children": []
+        }
+      ]
+    },
+    {
+      "label": "Support",
+      "href": "/donations/",
+      "children": [
+        {
+          "label": "Donations",
+          "href": "/donations/",
+          "children": []
+        },
+        {
+          "label": "Sponsors",
+          "href": "/sponsors/",
+          "children": []
+        }
+      ]
+    },
+    {
+      "label": "Contact",
+      "href": "/contact-us/",
+      "children": []
+    }
+  ]
+}

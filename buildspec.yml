@@ -1,0 +1,49 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - npm ci
+  pre_build:
+    commands:
+      - |
+        if [ -z "${CMS_CONTENT_BUCKET:-}" ]; then
+          echo "CMS_CONTENT_BUCKET is required for production site builds."
+          exit 1
+        fi
+        if [ -z "${PUBLIC_SITE_BUCKET:-}" ]; then
+          echo "PUBLIC_SITE_BUCKET is required for production site deploys."
+          exit 1
+        fi
+        CONTENT_URI="s3://${CMS_CONTENT_BUCKET}"
+        if [ -n "${CMS_CONTENT_PREFIX:-}" ]; then
+          CLEAN_PREFIX="${CMS_CONTENT_PREFIX#/}"
+          CLEAN_PREFIX="${CLEAN_PREFIX%/}"
+          CONTENT_URI="${CONTENT_URI}/${CLEAN_PREFIX}"
+        fi
+        echo "Syncing CMS content from ${CONTENT_URI}"
+        mkdir -p ./site-assets/content
+        aws s3 sync "${CONTENT_URI}" ./site-assets/content --delete
+      - npm run seed:media
+  build:
+    commands:
+      - npm run build:site
+  post_build:
+    commands:
+      - aws s3 sync apps/site/dist "s3://${PUBLIC_SITE_BUCKET}" --delete
+      - |
+        if [ -n "${CLOUDFRONT_DISTRIBUTION_ID:-}" ]; then
+          aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths "/*"
+        else
+          echo "CLOUDFRONT_DISTRIBUTION_ID not set; skipping invalidation."
+        fi
+
+artifacts:
+  files:
+    - "**/*"
+  base-directory: apps/site/dist

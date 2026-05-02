@@ -1,0 +1,36 @@
+{
+  "name": "Community Site Engine Sample",
+  "tagline": "A bilingual sample community website.",
+  "description": "Example content for a community organization using Community Site Engine.",
+  "defaultLocale": "en",
+  "supportedLanguages": [
+    {
+      "code": "en",
+      "name": "English",
+      "nativeName": "English"
+    },
+    {
+      "code": "bg",
+      "name": "Bulgarian",
+      "nativeName": "Български"
+    }
+  ],
+  "locales": [
+    "en",
+    "bg"
+  ],
+  "eventTimeZone": "America/Phoenix",
+  "fonts": {
+    "default": "universal-serif",
+    "headings": "universal-serif",
+    "navigation": "system-sans"
+  },
+  "contactEmail": "hello@example.org",
+  "social": [
+    {
+      "label": "Email",
+      "href": "mailto:hello@example.org",
+      "variant": "plain"
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeBuild project for building and deploying a Community Site Engine static site from CMS content.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: s3cms-static-site-build
+  GitHubRepositoryUrl:
+    Type: String
+    Description: HTTPS clone URL for the repository that contains buildspec.yml.
+  SourceVersion:
+    Type: String
+    Default: main
+    Description: Branch, tag, or commit for CodeBuild to build.
+  CmsContentBucket:
+    Type: String
+    Description: Private S3 bucket used by the CMS API.
+  CmsContentPrefix:
+    Type: String
+    Default: ""
+    Description: Optional prefix inside the CMS content bucket.
+  PublicSiteBucket:
+    Type: String
+    Description: Private S3 bucket used as the CloudFront origin for the static site.
+  CloudFrontDistributionId:
+    Type: String
+    Description: CloudFront distribution to invalidate after deploy.
+
+Resources:
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: static-site-build
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}:*
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${CmsContentBucket}
+                  - !Sub arn:aws:s3:::${PublicSiteBucket}
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub arn:aws:s3:::${CmsContentBucket}/*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub arn:aws:s3:::${PublicSiteBucket}/*
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                Resource: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionId}
+
+  StaticSiteBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ProjectName
+      Description: Build and deploy an Astro static site from CMS content in S3.
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      ConcurrentBuildLimit: 1
+      QueuedTimeoutInMinutes: 30
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: false
+        EnvironmentVariables:
+          - Name: CMS_CONTENT_BUCKET
+            Type: PLAINTEXT
+            Value: !Ref CmsContentBucket
+          - Name: CMS_CONTENT_PREFIX
+            Type: PLAINTEXT
+            Value: !Ref CmsContentPrefix
+          - Name: PUBLIC_SITE_BUCKET
+            Type: PLAINTEXT
+            Value: !Ref PublicSiteBucket
+          - Name: CLOUDFRONT_DISTRIBUTION_ID
+            Type: PLAINTEXT
+            Value: !Ref CloudFrontDistributionId
+      Source:
+        Type: GITHUB
+        Location: !Ref GitHubRepositoryUrl
+        BuildSpec: buildspec.yml
+      SourceVersion: !Ref SourceVersion
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+
+Outputs:
+  CodeBuildProjectName:
+    Value: !Ref StaticSiteBuildProject
+  CodeBuildServiceRoleArn:
+    Value: !GetAtt CodeBuildServiceRole.Arn

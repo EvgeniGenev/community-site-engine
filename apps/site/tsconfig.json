@@ -1,0 +1,9 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@community-site-engine/shared": ["../../packages/shared/src/index.ts"]
+    }
+  }
+}

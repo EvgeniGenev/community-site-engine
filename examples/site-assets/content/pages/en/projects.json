@@ -1,0 +1,44 @@
+{
+  "id": "projects",
+  "locale": "en",
+  "status": "published",
+  "title": "Projects",
+  "slug": "projects",
+  "translationKey": "projects",
+  "seo": {
+    "title": "Projects",
+    "description": "Sample community projects."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Projects",
+      "body": "Showcase active initiatives and long-running programs.",
+      "image": {
+        "src": "/media/gallery/community-workshop.svg",
+        "alt": "People attending a workshop",
+        "caption": "Skills workshop",
+        "description": "Illustration of a small group learning together at tables."
+      },
+      "actions": []
+    },
+    {
+      "type": "cardGrid",
+      "title": "Sample projects",
+      "cards": [
+        {
+          "title": "Community Garden",
+          "body": "A seasonal volunteer project for shared green space."
+        },
+        {
+          "title": "Skill Share Series",
+          "body": "Monthly classes led by volunteers and local partners."
+        },
+        {
+          "title": "Welcome Desk",
+          "body": "A simple resource table at events for new participants."
+        }
+      ]
+    }
+  ]
+}

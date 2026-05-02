@@ -1,0 +1,62 @@
+{
+  "locale": "bg",
+  "items": [
+    {
+      "label": "Събития",
+      "href": "/bg/sabitiya/",
+      "children": []
+    },
+    {
+      "label": "Новини и статии",
+      "href": "/bg/novini-i-statii/",
+      "children": []
+    },
+    {
+      "label": "Галерия",
+      "href": "/bg/galeria/",
+      "children": []
+    },
+    {
+      "label": "За нас",
+      "href": "/bg/za-nas/",
+      "children": [
+        {
+          "label": "Мисия и ценности",
+          "href": "/bg/misia-i-tsennosti/",
+          "children": []
+        },
+        {
+          "label": "Проекти",
+          "href": "/bg/proekti/",
+          "children": []
+        },
+        {
+          "label": "Доброволци",
+          "href": "/bg/dobrovoltsi/",
+          "children": []
+        }
+      ]
+    },
+    {
+      "label": "Подкрепа",
+      "href": "/bg/dareniya/",
+      "children": [
+        {
+          "label": "Дарения",
+          "href": "/bg/dareniya/",
+          "children": []
+        },
+        {
+          "label": "Спонсори",
+          "href": "/bg/sponsori/",
+          "children": []
+        }
+      ]
+    },
+    {
+      "label": "Контакти",
+      "href": "/bg/kontakti/",
+      "children": []
+    }
+  ]
+}

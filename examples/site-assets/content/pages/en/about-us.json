@@ -1,0 +1,50 @@
+{
+  "id": "about-us",
+  "locale": "en",
+  "status": "published",
+  "title": "About Us",
+  "slug": "about-us",
+  "translationKey": "about-us",
+  "seo": {
+    "title": "About Us",
+    "description": "Sample about page for a community organization."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "eyebrow": "About",
+      "title": "A simple example for a community organization",
+      "body": "This page demonstrates how to describe a mission, audience, and local programs without tying the template to a specific real organization.",
+      "image": {
+        "src": "/media/gallery/community-picnic.svg",
+        "alt": "Families sharing food at a picnic",
+        "caption": "Neighborhood picnic",
+        "description": "Illustration of people sharing food and conversation outdoors."
+      },
+      "actions": []
+    },
+    {
+      "type": "richText",
+      "title": "Who we are",
+      "body": "We are a sample community group focused on connection, learning, service, and shared local resources. Replace this text with your organization story, board information, and program summary."
+    },
+    {
+      "type": "cardGrid",
+      "title": "Our focus areas",
+      "cards": [
+        {
+          "title": "Connection",
+          "body": "Create welcoming spaces where neighbors can meet and support each other."
+        },
+        {
+          "title": "Learning",
+          "body": "Offer practical workshops and cultural programs for all ages."
+        },
+        {
+          "title": "Service",
+          "body": "Organize volunteer projects that improve shared community spaces."
+        }
+      ]
+    }
+  ]
+}

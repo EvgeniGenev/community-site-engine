@@ -1,0 +1,21 @@
+---
+import Blocks from "../../components/Blocks.astro";
+import Layout from "../../components/Layout.astro";
+import { getArticles, getContentLocales, getGallery, getLocalizedEvents, getNavigation, getPages, getSettings } from "../../content";
+
+export async function getStaticPaths() {
+  const locales = (await getContentLocales()).filter((locale) => locale !== "en");
+  const pages = (await Promise.all(locales.map((locale) => getPages(locale)))).flat().filter((page) => page.slug !== "");
+  return pages.map((page) => ({ params: { locale: page.locale, slug: page.slug }, props: { page } }));
+}
+
+const { page } = Astro.props;
+const settings = await getSettings();
+const navigation = await getNavigation(page.locale);
+const events = await getLocalizedEvents(page.locale);
+const articles = await getArticles(page.locale);
+const galleryItems = await getGallery(page.locale);
+---
+<Layout page={page} settings={settings} navigation={navigation}>
+  <Blocks blocks={page.blocks} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} />
+</Layout>

@@ -1,0 +1,31 @@
+{
+  "id": "contact-us",
+  "locale": "en",
+  "status": "published",
+  "title": "Contact Us",
+  "slug": "contact-us",
+  "translationKey": "contact-us",
+  "seo": {
+    "title": "Contact Us",
+    "description": "Sample contact page."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Contact Us",
+      "body": "Use this page for your public email, meeting location, and inquiry instructions.",
+      "actions": [
+        {
+          "label": "Email the Team",
+          "href": "mailto:hello@example.org",
+          "variant": "primary"
+        }
+      ]
+    },
+    {
+      "type": "richText",
+      "title": "Sample contact details",
+      "body": "Email: hello@example.org\n\nMeeting location: Community room, local library, or another public venue.\n\nResponse time: Please allow two business days for replies."
+    }
+  ]
+}

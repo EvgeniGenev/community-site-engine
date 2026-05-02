@@ -1,0 +1,21 @@
+{
+  "id": "welcome-to-the-sample-community-site",
+  "locale": "en",
+  "status": "published",
+  "title": "Welcome to the sample community site",
+  "slug": "welcome-to-the-sample-community-site",
+  "date": "2026-05-01",
+  "category": "Announcements",
+  "excerpt": "This example article introduces the sample content model.",
+  "featuredImage": {
+    "src": "/media/gallery/community-welcome.svg",
+    "alt": "Neighbors meeting in a community hall",
+    "caption": "A welcoming community gathering",
+    "description": "Illustration of neighbors sharing ideas in a bright community room."
+  },
+  "body": "This is a sample article for a community website. Use articles for announcements, meeting recaps, member stories, and program updates.\n\nReplace this content with real editorial copy before launch.",
+  "seo": {
+    "title": "Welcome to the sample community site",
+    "description": "Example announcement article for Community Site Engine."
+  }
+}

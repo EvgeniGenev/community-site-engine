@@ -1,0 +1,546 @@
+:root {
+  --ink: #231f20;
+  --muted: #746d67;
+  --paper: #fffaf1;
+  --panel: #ffffff;
+  --line: #e8ded0;
+  --red: #c4161c;
+  --red-dark: #941116;
+  --gold: #c89d44;
+  --green: #2d7a46;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #fffaf1 0%, #f5efe5 45%, #ffffff 100%);
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 16px;
+  background: var(--red);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+button:hover {
+  background: var(--red-dark);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+button.small {
+  padding: 7px 11px;
+  font-size: 13px;
+}
+
+button.danger {
+  background: #3a3030;
+}
+
+button.danger:hover {
+  background: #000;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: #fff;
+  color: var(--ink);
+}
+
+textarea {
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 300px 330px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.loginShell {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.loginCard {
+  width: min(520px, 100%);
+  padding: clamp(26px, 5vw, 44px);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 24px 70px rgba(35, 31, 32, .14);
+}
+
+.sidebar,
+.items,
+.editor {
+  padding: 24px;
+  border-right: 1px solid var(--line);
+}
+
+.sidebar {
+  background: #231f20;
+  color: #fff;
+}
+
+.kicker {
+  margin: 0 0 8px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+label,
+.field {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.field span,
+label {
+  font-weight: 700;
+}
+
+.field small,
+.muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sidebar .field small,
+.sidebar .muted {
+  color: rgba(255, 255, 255, .68);
+}
+
+.status {
+  min-height: 44px;
+  color: #f0d7a6;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.roleBox {
+  display: grid;
+  gap: 5px;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.roleBox span {
+  color: var(--gold);
+  text-transform: capitalize;
+}
+
+.tabs {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.tabs button {
+  width: 100%;
+  background: rgba(255, 255, 255, .1);
+  text-align: left;
+  text-transform: capitalize;
+}
+
+.tabs button.active,
+.tabs button:hover {
+  background: var(--red);
+}
+
+.items {
+  overflow: auto;
+  background: rgba(255, 255, 255, .7);
+}
+
+.listHeader {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.item span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.item.active {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(196, 22, 28, .12);
+}
+
+.editor {
+  overflow: auto;
+}
+
+.wideEditor {
+  grid-column: 2 / -1;
+}
+
+.builder {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.editorHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.builderCard {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 12px 35px rgba(35, 31, 32, .06);
+}
+
+.blockCard {
+  border-left: 6px solid var(--red);
+}
+
+.blockHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.nested {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  background: #fffaf5;
+}
+
+.imageField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 18px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fffaf5;
+}
+
+.dateTimeField {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(140px, .9fr) minmax(120px, .7fr) auto;
+  gap: 14px;
+  align-items: end;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fffaf5;
+}
+
+.dateTimeField small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.imagePreview {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.imagePreview img,
+.galleryItem img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  object-fit: cover;
+  background: var(--line);
+}
+
+.imagePreview span {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+}
+
+.addBlock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.importCard h3 {
+  margin-top: 0;
+}
+
+.importRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.userGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.userCard {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+
+.userCard code {
+  padding: 8px;
+  border-radius: 10px;
+  background: #f5efe5;
+  color: var(--red-dark);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.menuIntro {
+  display: grid;
+  gap: 12px;
+}
+
+.menuEditor {
+  display: grid;
+  gap: 12px;
+}
+
+.menuItem {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  margin-left: calc(var(--menu-depth, 0) * 28px);
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--gold);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 10px 28px rgba(35, 31, 32, .05);
+}
+
+.menuDrag,
+.menuActions {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.menuDrag strong {
+  color: var(--red-dark);
+}
+
+.menuFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+.galleryManager {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(12px, 2vw, 22px);
+}
+
+.galleryItem {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: clamp(10px, 2vw, 16px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+}
+
+.languagePicker {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.fontPicker {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.fontGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 18px;
+}
+
+.languageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fffaf5;
+}
+
+.languageChoice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.languageChoice input {
+  width: auto;
+  margin-top: 4px;
+}
+
+.languageChoice span {
+  display: grid;
+  gap: 2px;
+}
+
+.languageChoice small {
+  color: var(--muted);
+}
+
+.jsonArea {
+  min-height: 62vh;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 14px;
+}
+
+.emptyState {
+  display: grid;
+  place-items: center;
+  min-height: 45vh;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 1180px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .wideEditor {
+    grid-column: auto;
+  }
+
+  .sidebar,
+  .items,
+  .editor {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 780px) {
+  .editorHeader,
+  .imageField,
+  .dateTimeField,
+  .importRow,
+  .menuItem,
+  .menuFields {
+    grid-template-columns: 1fr;
+  }
+
+  .menuItem {
+    margin-left: 0;
+  }
+
+  .galleryManager {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .galleryManager {
+    grid-template-columns: 1fr;
+  }
+}

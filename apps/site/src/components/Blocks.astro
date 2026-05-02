@@ -1,0 +1,391 @@
+---
+import type { Article, Event, MediaRef, PageBlock } from "@community-site-engine/shared";
+
+interface Props {
+  blocks: PageBlock[];
+  events: Event[];
+  articles: Article[];
+  galleryItems: MediaRef[];
+  eventTimeZone: string;
+}
+
+const { blocks, events, articles, galleryItems, eventTimeZone } = Astro.props;
+
+function escapeHtml(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function escapeAttribute(value: string) {
+  return escapeHtml(value).replaceAll("\"", "&quot;");
+}
+
+function safeMarkdownHref(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("#")) return trimmed;
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) return trimmed;
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return trimmed.includes(":") ? "" : trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "mailto:" ? trimmed : "";
+  } catch {
+    return "";
+  }
+}
+
+function inlineMarkdown(value: string) {
+  return escapeHtml(value)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) => {
+      const safeHref = safeMarkdownHref(href);
+      return safeHref ? `<a href="${escapeAttribute(safeHref)}">${label}</a>` : label;
+    });
+}
+
+function markdownToHtml(body?: string) {
+  const lines = (body ?? "").split("\n");
+  const html: string[] = [];
+  let listOpen = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (listOpen) {
+        html.push("</ul>");
+        listOpen = false;
+      }
+      continue;
+    }
+    if (trimmed.startsWith("### ")) {
+      if (listOpen) html.push("</ul>");
+      listOpen = false;
+      html.push(`<h3>${inlineMarkdown(trimmed.slice(4))}</h3>`);
+    } else if (trimmed.startsWith("## ")) {
+      if (listOpen) html.push("</ul>");
+      listOpen = false;
+      html.push(`<h2>${inlineMarkdown(trimmed.slice(3))}</h2>`);
+    } else if (trimmed.startsWith("- ")) {
+      if (!listOpen) {
+        html.push("<ul>");
+        listOpen = true;
+      }
+      html.push(`<li>${inlineMarkdown(trimmed.slice(2))}</li>`);
+    } else {
+      if (listOpen) html.push("</ul>");
+      listOpen = false;
+      html.push(`<p>${inlineMarkdown(trimmed)}</p>`);
+    }
+  }
+  if (listOpen) html.push("</ul>");
+  return html.join("");
+}
+
+function datePart(value: string, type: string, formatOptions: Intl.DateTimeFormatOptions = {}) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: eventTimeZone,
+    ...formatOptions
+  }).formatToParts(new Date(value));
+  return parts.find((item) => item.type === type)?.value ?? "";
+}
+
+function eventDateKey(value: string) {
+  const year = datePart(value, "year", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const month = datePart(value, "month", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const day = datePart(value, "day", { year: "numeric", month: "2-digit", day: "2-digit" });
+  return `${year}-${month}-${day}`;
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: eventTimeZone }).format(new Date(value));
+}
+
+const galleryScripts: string[] = [];
+const eventScripts: string[] = [];
+---
+{blocks.map((block) => {
+  if (block.type === "hero") {
+    return (
+      <section class="hero section" style={block.customCss}>
+        <div class="hero-copy">
+          {block.eyebrow && <p class="eyebrow">{block.eyebrow}</p>}
+          <h1>{block.title}</h1>
+          {block.body && <p class="lede">{block.body}</p>}
+          {block.actions.length > 0 && (
+            <div class="actions">
+              {block.actions.map((action) => <a class={`button ${action.variant}`} href={action.href}>{action.label}</a>)}
+            </div>
+          )}
+        </div>
+        {block.image && <img class="hero-image" src={block.image.src} alt={block.image.alt} />}
+      </section>
+    );
+  }
+
+  if (block.type === "richText") {
+    return (
+      <section class="section prose" style={block.customCss}>
+        {block.title && <h2>{block.title}</h2>}
+        <div set:html={markdownToHtml(block.body)} />
+      </section>
+    );
+  }
+
+  if (block.type === "cardGrid") {
+    return (
+      <section class="section" style={block.customCss}>
+        {block.title && <h2>{block.title}</h2>}
+        {block.intro && <p class="section-intro">{block.intro}</p>}
+        <div class="card-grid">
+          {block.cards.map((card) => (
+            <article class="card">
+              {card.image && <img src={card.image.src} alt={card.image.alt} />}
+              <h3>{card.title}</h3>
+              <p>{card.body}</p>
+              {card.href && <a href={card.href}>Read more</a>}
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (block.type === "gallery") {
+    const galleryId = `gallery-${galleryScripts.length}`;
+    galleryScripts.push(galleryId);
+    const items = galleryItems.length ? galleryItems : block.items;
+    return (
+      <section class="section gallery-shell" data-gallery-root={galleryId} style={block.customCss}>
+        {block.title && <h2>{block.title}</h2>}
+        {block.intro && <p class="section-intro">{block.intro}</p>}
+        <div class="gallery-grid">
+          {items.map((item, index) => (
+            <figure data-gallery-item data-page={Math.floor(index / 9) + 1}>
+              <button type="button" class="gallery-open" data-src={item.src} data-alt={item.alt} data-caption={item.caption ?? item.description ?? ""}>
+                <img src={item.src} alt={item.alt} loading="lazy" />
+              </button>
+              {item.caption && <figcaption>{item.caption}</figcaption>}
+            </figure>
+          ))}
+        </div>
+        <div class="gallery-pagination" aria-label="Gallery pagination"></div>
+        <dialog class="gallery-dialog" aria-label="Image preview">
+          <button type="button" class="dialog-close" aria-label="Close image preview">Close</button>
+          <img src="" alt="" />
+          <p></p>
+        </dialog>
+      </section>
+    );
+  }
+
+  if (block.type === "eventList") {
+    const selectedEvents = block.eventIds.length ? events.filter((event) => block.eventIds.includes(event.id)) : events;
+    const calendarEvents = selectedEvents.map((event) => ({ ...event, dateKey: eventDateKey(event.startsAt) }));
+    const eventsId = `events-${eventScripts.length}`;
+    eventScripts.push(eventsId);
+    return (
+      <section class="section events-calendar-shell" data-events-root={eventsId} data-events={JSON.stringify(calendarEvents)} data-time-zone={eventTimeZone} style={block.customCss}>
+        {block.title && <h2>{block.title}</h2>}
+        {block.intro && <p class="section-intro">{block.intro}</p>}
+        <div class="events-workspace">
+          <aside class="calendar-panel">
+            <div class="calendar-toolbar">
+              <button type="button" data-calendar-prev>Prev</button>
+              <strong data-calendar-title></strong>
+              <button type="button" data-calendar-next>Next</button>
+              <button type="button" data-calendar-today>Current</button>
+            </div>
+            <div class="calendar-grid" data-calendar-grid aria-label="Events calendar"></div>
+          </aside>
+          <div class="event-list" data-event-list>
+          {selectedEvents.map((event) => (
+            <article class="event-card" data-event-card data-date={eventDateKey(event.startsAt)}>
+              <div class="date-box">
+                <span>{datePart(event.startsAt, "month", { month: "short", day: "2-digit" })}</span>
+                <strong>{Number(datePart(event.startsAt, "day", { month: "short", day: "2-digit" }))}</strong>
+              </div>
+              <div>
+                <h3>{event.title}</h3>
+                <p class="meta">{formatDate(event.startsAt)}{event.address ? ` · ${event.address}` : ""}</p>
+                <p>{event.description}</p>
+                {event.notes && <p><strong>Note:</strong> {event.notes}</p>}
+              </div>
+            </article>
+          ))}
+            <p class="empty-events" data-empty-events hidden>No events scheduled for this date.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (block.type === "articleList") {
+    const selectedArticles = block.articleIds.length ? articles.filter((article) => block.articleIds.includes(article.id)) : articles;
+    return (
+      <section class="section" style={block.customCss}>
+        {block.title && <h2>{block.title}</h2>}
+        {block.intro && <p class="section-intro">{block.intro}</p>}
+        <div class="card-grid">
+          {selectedArticles.map((article) => (
+            <article class="card article">
+              {article.featuredImage && <img src={article.featuredImage.src} alt={article.featuredImage.alt} />}
+              <p class="eyebrow">{article.category} · {article.date}</p>
+              <h3>{article.title}</h3>
+              <p>{article.excerpt}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (block.type === "cta") {
+    return (
+      <section class="section cta" style={block.customCss}>
+        <h2>{block.title}</h2>
+        {block.body && <p>{block.body}</p>}
+        <div class="actions">
+          {block.actions.map((action) => <a class={`button ${action.variant}`} href={action.href}>{action.label}</a>)}
+        </div>
+      </section>
+    );
+  }
+})}
+
+{galleryScripts.length > 0 && (
+  <script is:inline>
+    document.querySelectorAll("[data-gallery-root]").forEach((root) => {
+      const items = Array.from(root.querySelectorAll("[data-gallery-item]"));
+      const pagination = root.querySelector(".gallery-pagination");
+      const dialog = root.querySelector(".gallery-dialog");
+      const dialogImage = dialog?.querySelector("img");
+      const dialogCaption = dialog?.querySelector("p");
+      const close = dialog?.querySelector(".dialog-close");
+      let page = 1;
+      const pages = Math.max(1, Math.ceil(items.length / 9));
+
+      function render() {
+        items.forEach((item) => {
+          item.hidden = Number(item.dataset.page) !== page;
+        });
+        if (!pagination) return;
+        pagination.innerHTML = "";
+        for (let i = 1; i <= pages; i += 1) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = String(i);
+          button.className = i === page ? "active" : "";
+          button.setAttribute("aria-label", `Show gallery page ${i}`);
+          button.addEventListener("click", () => {
+            page = i;
+            render();
+          });
+          pagination.append(button);
+        }
+      }
+
+      root.querySelectorAll(".gallery-open").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (!dialog || !dialogImage || !dialogCaption) return;
+          dialogImage.src = button.dataset.src || "";
+          dialogImage.alt = button.dataset.alt || "";
+          dialogCaption.textContent = button.dataset.caption || button.dataset.alt || "";
+          dialog.showModal();
+        });
+      });
+
+      close?.addEventListener("click", () => dialog?.close());
+      dialog?.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+      render();
+    });
+  </script>
+)}
+
+{eventScripts.length > 0 && (
+  <script is:inline>
+    document.querySelectorAll("[data-events-root]").forEach((root) => {
+      const events = JSON.parse(root.dataset.events || "[]");
+      const timeZone = root.dataset.timeZone || "America/Phoenix";
+      const title = root.querySelector("[data-calendar-title]");
+      const grid = root.querySelector("[data-calendar-grid]");
+      const cards = Array.from(root.querySelectorAll("[data-event-card]"));
+      const empty = root.querySelector("[data-empty-events]");
+      const today = new Date();
+      const todayKey = dateKeyInTimeZone(today, timeZone);
+      let cursor = monthFromKey(events[0]?.dateKey || todayKey);
+      const eventDates = new Set(events.map((event) => event.dateKey || event.startsAt.slice(0, 10)));
+
+      function dateKeyInTimeZone(date, zone) {
+        const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+        const part = (type) => parts.find((item) => item.type === type)?.value || "";
+        return `${part("year")}-${part("month")}-${part("day")}`;
+      }
+
+      function monthFromKey(key) {
+        const [year, month] = key.split("-").map(Number);
+        return new Date(year, month - 1, 1);
+      }
+
+      function dateKey(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function filter(date) {
+        let visible = 0;
+        cards.forEach((card) => {
+          const match = !date || card.dataset.date === date;
+          card.hidden = !match;
+          if (match) visible += 1;
+        });
+        if (empty) empty.hidden = visible > 0;
+      }
+
+      function renderCalendar() {
+        if (!grid || !title) return;
+        title.textContent = cursor.toLocaleString("en-US", { month: "long", year: "numeric" });
+        grid.innerHTML = "";
+        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((day) => {
+          const label = document.createElement("span");
+          label.className = "calendar-weekday";
+          label.textContent = day;
+          grid.append(label);
+        });
+        const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+        const start = new Date(first);
+        start.setDate(first.getDate() - first.getDay());
+        for (let i = 0; i < 42; i += 1) {
+          const date = new Date(start);
+          date.setDate(start.getDate() + i);
+          const key = dateKey(date);
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = String(date.getDate());
+          button.className = date.getMonth() !== cursor.getMonth() ? "muted" : "";
+          if (eventDates.has(key)) button.classList.add("has-event");
+          if (key === todayKey) button.classList.add("is-today");
+          button.addEventListener("click", () => filter(key));
+          grid.append(button);
+        }
+      }
+
+      root.querySelector("[data-calendar-prev]")?.addEventListener("click", () => {
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
+        renderCalendar();
+      });
+      root.querySelector("[data-calendar-next]")?.addEventListener("click", () => {
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        renderCalendar();
+      });
+      root.querySelector("[data-calendar-today]")?.addEventListener("click", () => {
+        cursor = monthFromKey(todayKey);
+        renderCalendar();
+        filter(null);
+      });
+      renderCalendar();
+      filter(null);
+    });
+  </script>
+)}

@@ -1,0 +1,23 @@
+---
+import Blocks from "../../components/Blocks.astro";
+import Layout from "../../components/Layout.astro";
+import { getArticles, getContentLocales, getGallery, getLocalizedEvents, getNavigation, getPage, getSettings } from "../../content";
+import type { Locale } from "@community-site-engine/shared";
+
+export async function getStaticPaths() {
+  const locales = (await getContentLocales()).filter((locale) => locale !== "en");
+  return locales.map((locale) => ({ params: { locale } }));
+}
+
+const locale = Astro.params.locale as Locale;
+const page = await getPage(locale, "");
+if (!page) throw new Error(`${locale} home page missing`);
+const settings = await getSettings();
+const navigation = await getNavigation(locale);
+const events = await getLocalizedEvents(locale);
+const articles = await getArticles(locale);
+const galleryItems = await getGallery(locale);
+---
+<Layout page={page} settings={settings} navigation={navigation}>
+  <Blocks blocks={page.blocks} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} />
+</Layout>

@@ -1,0 +1,78 @@
+{
+  "id": "home",
+  "locale": "en",
+  "status": "published",
+  "title": "Community Welcome Center",
+  "slug": "",
+  "translationKey": "home",
+  "seo": {
+    "title": "Community Welcome Center",
+    "description": "A sample community website built with Community Site Engine."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "eyebrow": "Community Site Engine Sample",
+      "title": "A welcoming hub for neighbors, volunteers, and local stories",
+      "body": "This sample site shows how a community organization can share events, news, projects, and resources in multiple languages.",
+      "image": {
+        "src": "/media/gallery/community-welcome.svg",
+        "alt": "Neighbors meeting in a community hall",
+        "caption": "A welcoming community gathering",
+        "description": "Illustration of neighbors sharing ideas in a bright community room."
+      },
+      "actions": [
+        {
+          "label": "See Events",
+          "href": "/events/",
+          "variant": "primary"
+        },
+        {
+          "label": "Join as a Volunteer",
+          "href": "/volunteers/",
+          "variant": "secondary"
+        }
+      ]
+    },
+    {
+      "type": "cardGrid",
+      "title": "What this sample includes",
+      "intro": "Use these pages as a starting point, then replace them with your real content.",
+      "cards": [
+        {
+          "title": "Events",
+          "body": "Publish upcoming gatherings, workshops, and volunteer days.",
+          "href": "/events/"
+        },
+        {
+          "title": "News & Articles",
+          "body": "Share updates, announcements, and community stories.",
+          "href": "/news-articles/"
+        },
+        {
+          "title": "Gallery",
+          "body": "Highlight images from programs and celebrations.",
+          "href": "/gallery/"
+        }
+      ]
+    },
+    {
+      "type": "eventList",
+      "title": "Upcoming Events",
+      "intro": "Sample events are included so the calendar and event list have content to display.",
+      "eventIds": []
+    },
+    {
+      "type": "cta",
+      "title": "Make this site your own",
+      "body": "Edit pages, menus, events, articles, gallery items, and styles from the admin app.",
+      "actions": [
+        {
+          "label": "Contact Us",
+          "href": "/contact-us/",
+          "variant": "primary"
+        }
+      ]
+    }
+  ]
+}

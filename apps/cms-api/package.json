@@ -1,0 +1,27 @@
+{
+  "name": "@community-site-engine/cms-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-codebuild": "^3.1040.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1039.0",
+    "@aws-sdk/client-s3": "^3.946.0",
+    "@community-site-engine/shared": "0.1.0",
+    "@hono/node-server": "^1.19.6",
+    "hono": "^4.10.6",
+    "mime": "^4.1.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

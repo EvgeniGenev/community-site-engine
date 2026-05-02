@@ -1,0 +1,27 @@
+{
+  "id": "skills-workshop",
+  "status": "published",
+  "title": "Skills Workshop: Simple Website Updates",
+  "slug": "skills-workshop",
+  "startsAt": "2026-06-06T10:30:00-07:00",
+  "endsAt": "2026-06-06T12:00:00-07:00",
+  "locationName": "Learning Lab",
+  "address": "789 Center Avenue",
+  "image": {
+    "src": "/media/gallery/community-workshop.svg",
+    "alt": "People attending a workshop",
+    "caption": "Skills workshop",
+    "description": "Illustration of a small group learning together at tables."
+  },
+  "description": "A beginner-friendly workshop for updating pages, events, articles, and gallery images.",
+  "notes": "Bring a laptop if possible.",
+  "translations": {
+    "bg": {
+      "title": "Работилница: лесни обновления на уебсайт",
+      "locationName": "Учебна зала",
+      "address": "Център Авеню 789",
+      "description": "Работилница за начинаещи за обновяване на страници, събития, статии и снимки.",
+      "notes": "Носете лаптоп, ако е възможно."
+    }
+  }
+}

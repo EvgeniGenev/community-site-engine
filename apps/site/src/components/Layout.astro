@@ -1,0 +1,96 @@
+---
+import { FONT_OPTIONS, type FontId, type Locale, type Navigation, type Page, type SiteSettings } from "@community-site-engine/shared";
+import { findTranslations, getStylesheets } from "../content";
+
+interface Props {
+  page: Page;
+  settings: SiteSettings;
+  navigation: Navigation;
+}
+
+const { page, settings, navigation } = Astro.props;
+const translations = await findTranslations(page);
+const stylesheets = await getStylesheets();
+const languages = settings.supportedLanguages ?? [
+  { code: "en", name: "English", nativeName: "English" }
+];
+const defaultLocale = settings.defaultLocale;
+const fonts = settings.fonts ?? { default: "universal-serif" as FontId };
+const fontStack = (id: FontId | undefined) => FONT_OPTIONS.find((font) => font.id === id)?.stack ?? FONT_OPTIONS[0].stack;
+const fontCss = `
+  :root {
+    --font-default: ${fontStack(fonts.default)};
+    --font-page: ${fontStack(fonts.page ?? fonts.default)};
+    --font-heading: ${fontStack(fonts.headings ?? fonts.default)};
+    --font-navigation: ${fontStack(fonts.navigation ?? fonts.default)};
+    --font-event: ${fontStack(fonts.event ?? fonts.default)};
+    --font-article: ${fontStack(fonts.article ?? fonts.default)};
+    --font-gallery: ${fontStack(fonts.gallery ?? fonts.default)};
+    --font-card: ${fontStack(fonts.card ?? fonts.default)};
+    --font-cta: ${fontStack(fonts.cta ?? fonts.default)};
+  }
+`;
+const switcherItems = languages.map((language) => {
+  const translatedPage = language.code === page.locale ? page : translations.find((item) => item.locale === language.code);
+  const slugPath = translatedPage?.slug ? `${translatedPage.slug}/` : "";
+  const href = translatedPage ? (language.code === defaultLocale ? `/${slugPath}` : `/${language.code}/${slugPath}`) : "#";
+  return { language, href, available: !!translatedPage, active: language.code === page.locale };
+});
+const htmlLang: Locale = page.locale;
+---
+<!doctype html>
+<html lang={htmlLang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{page.seo.title}</title>
+    <meta name="description" content={page.seo.description} />
+    {settings.siteIcon?.src && <link rel="icon" href={settings.siteIcon.src} />}
+    {stylesheets.map((stylesheet) => (
+      stylesheet.css.trim() && <style data-cms-css={stylesheet.key} set:html={stylesheet.css} />
+    ))}
+    <style data-cms-fonts set:html={fontCss} />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href={page.locale === defaultLocale ? "/" : `/${page.locale}/`} aria-label={settings.name}>
+        {settings.siteIcon?.src ? <img class="brand-icon" src={settings.siteIcon.src} alt="" /> : <span class="brand-mark">CMS</span>}
+        <span class="brand-copy">
+          <span class="brand-text">{settings.name}</span>
+          {settings.tagline && <span class="brand-tagline">{settings.tagline}</span>}
+        </span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation">
+        {navigation.items.map((item) => (
+          <div class="nav-item">
+            <a href={item.href}>{item.label}</a>
+            {item.children.length > 0 && (
+              <div class="nav-dropdown">
+                {item.children.map((child) => <a href={child.href}>{child.label}</a>)}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+      <div class="language-switcher" aria-label="Language switcher">
+        {switcherItems.map((item) => (
+          item.available
+            ? <a class={item.active ? "language active" : "language"} href={item.href} aria-current={item.active ? "page" : undefined}>{item.language.code.toUpperCase()}</a>
+            : <span class="language disabled" title={`${item.language.name} not available for this page`}>{item.language.code.toUpperCase()}</span>
+        ))}
+      </div>
+    </header>
+    <slot />
+    <footer class="site-footer">
+      <div>
+        <strong>{settings.name}</strong>
+        {settings.tagline && <p>{settings.tagline}</p>}
+        <p>{settings.description}</p>
+      </div>
+      <div>
+        <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
+        {settings.social.map((link) => <a href={link.href}>{link.label}</a>)}
+      </div>
+    </footer>
+  </body>
+</html>

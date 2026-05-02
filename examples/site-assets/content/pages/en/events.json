@@ -1,0 +1,26 @@
+{
+  "id": "events",
+  "locale": "en",
+  "status": "published",
+  "title": "Events",
+  "slug": "events",
+  "translationKey": "events",
+  "seo": {
+    "title": "Events",
+    "description": "Sample community events."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Events",
+      "body": "Browse upcoming and past sample events.",
+      "actions": []
+    },
+    {
+      "type": "eventList",
+      "title": "Community Calendar",
+      "intro": "Click dates in the calendar to filter events.",
+      "eventIds": []
+    }
+  ]
+}

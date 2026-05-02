@@ -1,0 +1,49 @@
+{
+  "id": "mission-and-values",
+  "locale": "en",
+  "status": "published",
+  "title": "Mission and Values",
+  "slug": "mission-and-values",
+  "translationKey": "mission-and-values",
+  "seo": {
+    "title": "Mission and Values",
+    "description": "Sample mission and values page."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "eyebrow": "Mission",
+      "title": "Build belonging through shared action",
+      "body": "Our sample mission is to help neighbors participate, learn, volunteer, and celebrate together.",
+      "image": {
+        "src": "/media/gallery/community-garden.svg",
+        "alt": "Volunteers planting flowers",
+        "caption": "Community garden day",
+        "description": "Illustration of volunteers planting flowers and vegetables together."
+      },
+      "actions": []
+    },
+    {
+      "type": "cardGrid",
+      "title": "Values",
+      "cards": [
+        {
+          "title": "Welcome",
+          "body": "Make participation easy for newcomers and long-time members."
+        },
+        {
+          "title": "Respect",
+          "body": "Honor different backgrounds, languages, abilities, and schedules."
+        },
+        {
+          "title": "Stewardship",
+          "body": "Use shared resources carefully and transparently."
+        },
+        {
+          "title": "Collaboration",
+          "body": "Work with local partners and volunteers to increase impact."
+        }
+      ]
+    }
+  ]
+}

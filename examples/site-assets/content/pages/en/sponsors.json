@@ -1,0 +1,34 @@
+{
+  "id": "sponsors",
+  "locale": "en",
+  "status": "published",
+  "title": "Sponsors",
+  "slug": "sponsors",
+  "translationKey": "sponsors",
+  "seo": {
+    "title": "Sponsors",
+    "description": "Sample sponsors page."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Sponsors",
+      "body": "Recognize community partners and supporters here.",
+      "actions": []
+    },
+    {
+      "type": "cardGrid",
+      "title": "Sample sponsor benefits",
+      "cards": [
+        {
+          "title": "Event visibility",
+          "body": "Thank sponsors in event listings and printed programs."
+        },
+        {
+          "title": "Community support",
+          "body": "Show how contributions fund practical local needs."
+        }
+      ]
+    }
+  ]
+}
