@@ -876,12 +876,11 @@ function App() {
       const payload = {
         ...userDraft,
         email: userDraft.email || undefined,
-        token: userDraft.token || undefined,
         temporaryPassword: userDraft.temporaryPassword || undefined
       };
       await request(token, `/api/users/${encodeURIComponent(userDraft.id)}`, { method: "PUT", body: JSON.stringify(payload) });
       setMessage(`Saved user ${userDraft.id}`);
-      setUserDraft({ id: "", name: "", role: "contributor", email: "", token: "", temporaryPassword: "", suppressEmail: true });
+      setUserDraft({ id: "", name: "", role: "contributor", email: "", temporaryPassword: "", suppressEmail: true });
       await loadUsers();
     } catch (error) {
       setMessage(`Could not save user: ${error instanceof Error ? error.message : String(error)}`);
@@ -913,7 +912,7 @@ function App() {
           })
         }
       );
-      setMessage(`Reset ${passwordResetDraft.id} ${result.source === "local" ? "local access token" : "password"} as ${result.temporary ? "temporary" : "permanent"}.`);
+      setMessage(`Reset ${passwordResetDraft.id} ${result.source === "local" ? "local credential" : "password"} as ${result.temporary ? "temporary" : "permanent"}.`);
       setPasswordResetDraft({ id: "", password: "", permanent: false });
       await loadUsers();
     } catch (error) {
@@ -1369,7 +1368,7 @@ function App() {
           ) : (
             <>
               <label>
-                Access token
+                Development credential
                 <input value={token} onChange={(event) => setToken(event.target.value)} />
               </label>
               <button onClick={() => void refresh()}>Sign In</button>
@@ -1853,7 +1852,7 @@ function App() {
                 <h3>Reset Password for {passwordResetDraft.id}</h3>
                 <p className="muted">
                   Cognito passwords can be temporary or permanent. Temporary passwords require the user to choose a new password at next sign-in.
-                  In local development, this resets the user's dev token instead.
+                  In local development, this rotates the user's development credential instead.
                 </p>
                 <TextField label="New password (leave blank to generate)" value={passwordResetDraft.password} onChange={(password) => setPasswordResetDraft({ ...passwordResetDraft, password })} />
                 <label className="languageChoice">
