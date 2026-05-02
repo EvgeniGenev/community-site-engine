@@ -121,6 +121,8 @@ Resources:
 
   SiteDistribution:
     Type: AWS::CloudFront::Distribution
+    DependsOn:
+      - SitePrettyUrlFunction
     Properties:
       DistributionConfig:
         Enabled: true
@@ -144,6 +146,9 @@ Resources:
             QueryString: false
             Cookies:
               Forward: none
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt SitePrettyUrlFunction.FunctionARN
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 404
@@ -154,6 +159,26 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${SiteName}-site-cdn-${AWS::Region}-${AWS::AccountId}
+
+  SitePrettyUrlFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub ${SiteName}-pretty-url-${AWS::Region}-${AWS::AccountId}
+      AutoPublish: true
+      FunctionConfig:
+        Comment: !Sub ${SiteName}-pretty-url-${AWS::Region}-${AWS::AccountId}
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          if (uri.endsWith("/")) {
+            request.uri = uri + "index.html";
+          } else if (!uri.includes(".")) {
+            request.uri = uri + "/index.html";
+          }
+          return request;
+        }
 
   AdminDistribution:
     Type: AWS::CloudFront::Distribution
