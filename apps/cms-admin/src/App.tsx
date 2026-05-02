@@ -53,6 +53,7 @@ interface PageBlock {
   title?: string | undefined;
   body?: string | undefined;
   customCss?: string | undefined;
+  layoutColumn?: string | undefined;
   eyebrow?: string | undefined;
   intro?: string | undefined;
   image?: MediaRef | undefined;
@@ -71,7 +72,18 @@ interface Page {
   slug: string;
   translationKey: string;
   seo: { title: string; description: string };
+  layout?: PageLayout | undefined;
   blocks: PageBlock[];
+}
+
+interface PageLayout {
+  columns: PageLayoutColumn[];
+}
+
+interface PageLayoutColumn {
+  id: string;
+  label: string;
+  width: number;
 }
 
 interface Article {
@@ -558,6 +570,61 @@ function CssField(props: { value: string | undefined; onChange: (value: string) 
   );
 }
 
+const DEFAULT_PAGE_COLUMNS: PageLayoutColumn[] = [
+  { id: "main", label: "Main", width: 100 }
+];
+
+const COLUMN_PRESETS: Record<number, PageLayoutColumn[]> = {
+  1: [{ id: "main", label: "Main", width: 100 }],
+  2: [
+    { id: "main", label: "Left", width: 50 },
+    { id: "side", label: "Right", width: 50 }
+  ],
+  3: [
+    { id: "main", label: "Left", width: 34 },
+    { id: "middle", label: "Middle", width: 33 },
+    { id: "side", label: "Right", width: 33 }
+  ]
+};
+
+function pageLayout(page: Page): PageLayout {
+  const columns = page.layout?.columns?.length ? page.layout.columns : DEFAULT_PAGE_COLUMNS;
+  return { columns: columns.slice(0, 3).map((column, index) => ({
+    id: column.id || COLUMN_PRESETS[3]?.[index]?.id || `column-${index + 1}`,
+    label: column.label || `Column ${index + 1}`,
+    width: Math.min(100, Math.max(1, Math.round(Number(column.width) || 1)))
+  })) };
+}
+
+function columnForBlock(block: PageBlock, layout: PageLayout) {
+  return block.layoutColumn && layout.columns.some((column) => column.id === block.layoutColumn)
+    ? block.layoutColumn
+    : layout.columns[0]?.id ?? "main";
+}
+
+function makeLayout(columnCount: number, previous?: PageLayout): PageLayout {
+  const preset = COLUMN_PRESETS[columnCount] ?? COLUMN_PRESETS[1] ?? DEFAULT_PAGE_COLUMNS;
+  return {
+    columns: preset.map((column, index) => {
+      const existing = previous?.columns[index];
+      return {
+        ...column,
+        label: existing?.label || column.label,
+        width: existing?.width ?? column.width
+      };
+    })
+  };
+}
+
+function moveBlock(blocks: PageBlock[], fromIndex: number, toIndex: number, layoutColumn: string) {
+  if (fromIndex < 0 || fromIndex >= blocks.length) return blocks;
+  const next = [...blocks];
+  const [moved] = next.splice(fromIndex, 1);
+  if (!moved) return blocks;
+  next.splice(Math.min(Math.max(toIndex, 0), next.length), 0, { ...moved, layoutColumn });
+  return next;
+}
+
 function ImageField(props: { label: string; value: MediaRef | undefined; onChange: (value: MediaRef | undefined) => void; onUpload: (folder: MediaFolder) => Promise<MediaRef | null>; folder: MediaFolder }) {
   return (
     <div className="imageField">
@@ -675,6 +742,7 @@ function App() {
   const [cssDraft, setCssDraft] = useState<CssFile | null>(null);
   const [facebookImportUrl, setFacebookImportUrl] = useState("");
   const [facebookImporting, setFacebookImporting] = useState(false);
+  const [draggedBlockIndex, setDraggedBlockIndex] = useState<number | null>(null);
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [userSource, setUserSource] = useState("local");
   const [userDraft, setUserDraft] = useState<ManagedUser & { temporaryPassword?: string; suppressEmail?: boolean }>({
@@ -694,6 +762,8 @@ function App() {
   const role = user?.role;
   const structureAllowed = canStructure(role);
   const hasCognitoLogin = Boolean(cognitoConfig());
+  const currentPageLayout = page ? pageLayout(page) : null;
+  const pageLayoutTotal = currentPageLayout?.columns.reduce((sum, column) => sum + column.width, 0) ?? 100;
 
   async function refresh(activeToken = token) {
     try {
@@ -1456,20 +1526,120 @@ function App() {
               <TextField label="SEO title" value={page.seo.title} onChange={(title) => setPage({ ...page, seo: { ...page.seo, title } })} />
               <TextArea label="SEO description" value={page.seo.description} onChange={(description) => setPage({ ...page, seo: { ...page.seo, description } })} />
             </div>
-            {page.blocks.map((block, index) => (
-              <BlockEditor
-                key={index}
-                block={block}
-                disabledStructure={!structureAllowed}
-                onUpload={uploadMedia}
-                update={(updated) => setPage({ ...page, blocks: page.blocks.map((item, itemIndex) => itemIndex === index ? updated : item) })}
-                remove={() => setPage({ ...page, blocks: page.blocks.filter((_, itemIndex) => itemIndex !== index) })}
-              />
-            ))}
+            {currentPageLayout && (
+              <div className="builderCard layoutControls">
+                <div>
+                  <h3>Page Layout</h3>
+                  <p className="muted">Choose one, two, or three columns. Width values work as percentages and are applied as responsive column ratios on the public site.</p>
+                </div>
+                <label className="field">
+                  <span>Columns</span>
+                  <select
+                    value={currentPageLayout.columns.length}
+                    disabled={!structureAllowed}
+                    onChange={(event) => {
+                      const layout = makeLayout(Number(event.target.value), currentPageLayout);
+                      setPage({
+                        ...page,
+                        layout,
+                        blocks: page.blocks.map((block) => ({
+                          ...block,
+                          layoutColumn: layout.columns.some((column) => column.id === block.layoutColumn) ? block.layoutColumn : layout.columns[0]?.id
+                        }))
+                      });
+                    }}
+                  >
+                    <option value={1}>Single column</option>
+                    <option value={2}>Two columns</option>
+                    <option value={3}>Three columns</option>
+                  </select>
+                </label>
+                <div className="columnControls">
+                  {currentPageLayout.columns.map((column, columnIndex) => (
+                    <div className="columnControl" key={column.id}>
+                      <TextField label="Column label" value={column.label} disabled={!structureAllowed} onChange={(label) => {
+                        const columns = currentPageLayout.columns.map((item) => item.id === column.id ? { ...item, label } : item);
+                        setPage({ ...page, layout: { columns } });
+                      }} />
+                      <label className="field">
+                        <span>Width %</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={column.width}
+                          disabled={!structureAllowed}
+                          onChange={(event) => {
+                            const width = Math.min(100, Math.max(1, Number(event.target.value) || 1));
+                            const columns = currentPageLayout.columns.map((item) => item.id === column.id ? { ...item, width } : item);
+                            setPage({ ...page, layout: { columns } });
+                          }}
+                        />
+                      </label>
+                      <small>Column {columnIndex + 1}</small>
+                    </div>
+                  ))}
+                </div>
+                <p className={pageLayoutTotal === 100 ? "muted" : "warningText"}>Current width total: {pageLayoutTotal}%. For predictable results, keep the total at 100%.</p>
+              </div>
+            )}
+            {currentPageLayout && (
+              <div className="pageCanvas" style={{ "--admin-page-columns": currentPageLayout.columns.map((column) => `${column.width}fr`).join(" ") } as CSSProperties}>
+                {currentPageLayout.columns.map((column) => {
+                  const columnBlocks = page.blocks
+                    .map((block, index) => ({ block, index }))
+                    .filter((item) => columnForBlock(item.block, currentPageLayout) === column.id);
+                  return (
+                    <section
+                      className="pageColumn"
+                      key={column.id}
+                      onDragOver={(event) => structureAllowed && event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (!structureAllowed || draggedBlockIndex === null) return;
+                        setPage({ ...page, blocks: moveBlock(page.blocks, draggedBlockIndex, page.blocks.length, column.id) });
+                        setDraggedBlockIndex(null);
+                      }}
+                    >
+                      <header className="pageColumnHeader">
+                        <strong>{column.label}</strong>
+                        <span>{column.width}%</span>
+                      </header>
+                      {columnBlocks.length === 0 && <div className="dropHint">Drag sections here</div>}
+                      {columnBlocks.map(({ block, index }) => (
+                        <div
+                          className="draggableBlock"
+                          key={index}
+                          draggable={structureAllowed}
+                          onDragStart={() => setDraggedBlockIndex(index)}
+                          onDragEnd={() => setDraggedBlockIndex(null)}
+                          onDragOver={(event) => structureAllowed && event.preventDefault()}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            if (!structureAllowed || draggedBlockIndex === null) return;
+                            setPage({ ...page, blocks: moveBlock(page.blocks, draggedBlockIndex, index, column.id) });
+                            setDraggedBlockIndex(null);
+                          }}
+                        >
+                          {structureAllowed && <div className="dragHandle" aria-label={`Drag ${block.type} section`}>Drag to reorder</div>}
+                          <BlockEditor
+                            block={{ ...block, layoutColumn: column.id }}
+                            disabledStructure={!structureAllowed}
+                            onUpload={uploadMedia}
+                            update={(updated) => setPage({ ...page, blocks: page.blocks.map((item, itemIndex) => itemIndex === index ? { ...updated, layoutColumn: column.id } : item) })}
+                            remove={() => setPage({ ...page, blocks: page.blocks.filter((_, itemIndex) => itemIndex !== index) })}
+                          />
+                        </div>
+                      ))}
+                    </section>
+                  );
+                })}
+              </div>
+            )}
             {structureAllowed && (
               <div className="builderCard addBlock">
                 {(["hero", "richText", "cardGrid", "gallery", "eventList", "articleList", "cta"] as BlockType[]).map((type) => (
-                  <button key={type} onClick={() => setPage({ ...page, blocks: [...page.blocks, { type, title: `New ${type}` }] })}>Add {type}</button>
+                  <button key={type} onClick={() => setPage({ ...page, blocks: [...page.blocks, { type, title: `New ${type}`, layoutColumn: currentPageLayout?.columns[0]?.id ?? "main" }] })}>Add {type}</button>
                 ))}
               </div>
             )}

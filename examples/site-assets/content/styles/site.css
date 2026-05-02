@@ -161,6 +161,30 @@ button:hover, .button:hover { background: var(--accent-dark); }
   padding: clamp(2rem, 6vw, 4.5rem) 0;
 }
 
+.page-layout {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.page-layout--single {
+  width: auto;
+  margin: 0;
+}
+
+.page-layout:not(.page-layout--single) {
+  display: grid;
+  grid-template-columns: var(--page-columns);
+  gap: clamp(1rem, 3vw, 2rem);
+  align-items: start;
+  padding: clamp(2rem, 6vw, 4.5rem) 0;
+}
+
+.page-layout:not(.page-layout--single) > .section {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 .hero {
   width: 100%;
   display: grid;
@@ -311,6 +335,8 @@ h3 { font-size: clamp(1.25rem, 2vw, 1.65rem); }
   .events-workspace { grid-template-columns: 1fr; }
   .calendar-panel { position: static; }
   .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page-layout[data-columns="3"] { grid-template-columns: 1fr; }
+  .page-layout[data-columns="3"] > .section { grid-column: 1 !important; }
 }
 
 @media (max-width: 560px) {
@@ -320,6 +346,11 @@ h3 { font-size: clamp(1.25rem, 2vw, 1.65rem); }
   .nav-dropdown { position: static; display: grid; margin-top: .3rem; box-shadow: none; }
   .hero { padding: 2.2rem 1rem; }
   .gallery-grid { grid-template-columns: 1fr; }
+  .page-layout:not(.page-layout--single) {
+    width: min(100% - 2rem, 1120px);
+    grid-template-columns: 1fr;
+  }
+  .page-layout:not(.page-layout--single) > .section { grid-column: 1 !important; }
   .event-card { grid-template-columns: 1fr; }
   .calendar-toolbar { grid-template-columns: 1fr 1fr; }
   .calendar-toolbar strong { grid-column: 1 / -1; order: -1; }

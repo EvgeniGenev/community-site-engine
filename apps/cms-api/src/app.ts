@@ -852,12 +852,18 @@ function assertSamePageStructure(existing: Page, next: Page) {
   if (existing.id !== next.id || existing.slug !== next.slug || existing.locale !== next.locale || existing.translationKey !== next.translationKey) {
     throw new HTTPException(403, { message: "Contributor cannot change page identity, slug, locale, or translation key" });
   }
+  if (JSON.stringify(existing.layout) !== JSON.stringify(next.layout)) {
+    throw new HTTPException(403, { message: "Contributor cannot change page layout" });
+  }
   if (existing.blocks.length !== next.blocks.length) {
     throw new HTTPException(403, { message: "Contributor cannot add or remove page sections" });
   }
   existing.blocks.forEach((block, index) => {
     if (block.type !== next.blocks[index]?.type) {
       throw new HTTPException(403, { message: "Contributor cannot change page section types" });
+    }
+    if ((block.layoutColumn ?? "") !== (next.blocks[index]?.layoutColumn ?? "")) {
+      throw new HTTPException(403, { message: "Contributor cannot move page sections between columns" });
     }
     if ((block.customCss ?? "") !== (next.blocks[index]?.customCss ?? "")) {
       throw new HTTPException(403, { message: "Contributor cannot change custom CSS" });

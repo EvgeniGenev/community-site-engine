@@ -268,13 +268,26 @@ export const PageBlockSchema = z.discriminatedUnion("type", [
   EventListBlockSchema,
   ArticleListBlockSchema,
   CtaBlockSchema
-]);
+]).and(z.object({
+  layoutColumn: z.string().optional()
+}));
 export type PageBlock = z.infer<typeof PageBlockSchema>;
 
 export const SeoSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1)
 });
+
+export const PageLayoutSchema = z.object({
+  columns: z.array(z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    width: z.number().min(1).max(100)
+  })).min(1).max(3)
+}).default({
+  columns: [{ id: "main", label: "Main", width: 100 }]
+});
+export type PageLayout = z.infer<typeof PageLayoutSchema>;
 
 export const PageSchema = z.object({
   id: z.string().min(1),
@@ -284,6 +297,7 @@ export const PageSchema = z.object({
   slug: z.string(),
   translationKey: z.string().min(1),
   seo: SeoSchema,
+  layout: PageLayoutSchema,
   blocks: z.array(PageBlockSchema)
 });
 export type Page = z.infer<typeof PageSchema>;

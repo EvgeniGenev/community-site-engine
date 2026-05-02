@@ -1,15 +1,20 @@
 ---
-import type { Article, Event, MediaRef, PageBlock } from "@community-site-engine/shared";
+import type { Article, Event, MediaRef, PageBlock, PageLayout } from "@community-site-engine/shared";
 
 interface Props {
   blocks: PageBlock[];
+  layout?: PageLayout;
   events: Event[];
   articles: Article[];
   galleryItems: MediaRef[];
   eventTimeZone: string;
 }
 
-const { blocks, events, articles, galleryItems, eventTimeZone } = Astro.props;
+const { blocks, layout, events, articles, galleryItems, eventTimeZone } = Astro.props;
+const activeLayout = layout ?? { columns: [{ id: "main", label: "Main", width: 100 }] };
+const hasMultiColumnLayout = activeLayout.columns.length > 1;
+const columnIds = new Set(activeLayout.columns.map((column) => column.id));
+const pageGridStyle = `--page-columns: ${activeLayout.columns.map((column) => `${column.width}fr`).join(" ")};`;
 
 function escapeHtml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -98,13 +103,22 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: eventTimeZone }).format(new Date(value));
 }
 
+function blockStyle(block: PageBlock) {
+  const base = block.customCss ?? "";
+  if (!hasMultiColumnLayout) return base;
+  const requestedColumn = block.layoutColumn && columnIds.has(block.layoutColumn) ? block.layoutColumn : activeLayout.columns[0]?.id;
+  const columnIndex = Math.max(0, activeLayout.columns.findIndex((column) => column.id === requestedColumn));
+  return `${base}${base.trim().endsWith(";") || !base.trim() ? "" : ";"} grid-column: ${columnIndex + 1};`;
+}
+
 const galleryScripts: string[] = [];
 const eventScripts: string[] = [];
 ---
+<div class:list={["page-layout", { "page-layout--single": !hasMultiColumnLayout }]} data-columns={activeLayout.columns.length} style={pageGridStyle}>
 {blocks.map((block) => {
   if (block.type === "hero") {
     return (
-      <section class="hero section" style={block.customCss}>
+      <section class="hero section" style={blockStyle(block)}>
         <div class="hero-copy">
           {block.eyebrow && <p class="eyebrow">{block.eyebrow}</p>}
           <h1>{block.title}</h1>
@@ -122,7 +136,7 @@ const eventScripts: string[] = [];
 
   if (block.type === "richText") {
     return (
-      <section class="section prose" style={block.customCss}>
+      <section class="section prose" style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         <div set:html={markdownToHtml(block.body)} />
       </section>
@@ -131,7 +145,7 @@ const eventScripts: string[] = [];
 
   if (block.type === "cardGrid") {
     return (
-      <section class="section" style={block.customCss}>
+      <section class="section" style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         {block.intro && <p class="section-intro">{block.intro}</p>}
         <div class="card-grid">
@@ -153,7 +167,7 @@ const eventScripts: string[] = [];
     galleryScripts.push(galleryId);
     const items = galleryItems.length ? galleryItems : block.items;
     return (
-      <section class="section gallery-shell" data-gallery-root={galleryId} style={block.customCss}>
+      <section class="section gallery-shell" data-gallery-root={galleryId} style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         {block.intro && <p class="section-intro">{block.intro}</p>}
         <div class="gallery-grid">
@@ -182,7 +196,7 @@ const eventScripts: string[] = [];
     const eventsId = `events-${eventScripts.length}`;
     eventScripts.push(eventsId);
     return (
-      <section class="section events-calendar-shell" data-events-root={eventsId} data-events={JSON.stringify(calendarEvents)} data-time-zone={eventTimeZone} style={block.customCss}>
+      <section class="section events-calendar-shell" data-events-root={eventsId} data-events={JSON.stringify(calendarEvents)} data-time-zone={eventTimeZone} style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         {block.intro && <p class="section-intro">{block.intro}</p>}
         <div class="events-workspace">
@@ -220,7 +234,7 @@ const eventScripts: string[] = [];
   if (block.type === "articleList") {
     const selectedArticles = block.articleIds.length ? articles.filter((article) => block.articleIds.includes(article.id)) : articles;
     return (
-      <section class="section" style={block.customCss}>
+      <section class="section" style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         {block.intro && <p class="section-intro">{block.intro}</p>}
         <div class="card-grid">
@@ -239,7 +253,7 @@ const eventScripts: string[] = [];
 
   if (block.type === "cta") {
     return (
-      <section class="section cta" style={block.customCss}>
+      <section class="section cta" style={blockStyle(block)}>
         <h2>{block.title}</h2>
         {block.body && <p>{block.body}</p>}
         <div class="actions">
@@ -249,6 +263,7 @@ const eventScripts: string[] = [];
     );
   }
 })}
+</div>
 
 {galleryScripts.length > 0 && (
   <script is:inline>

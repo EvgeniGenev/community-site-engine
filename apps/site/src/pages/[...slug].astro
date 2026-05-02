@@ -1,14 +1,16 @@
 ---
 import Blocks from "../components/Blocks.astro";
 import Layout from "../components/Layout.astro";
-import { getArticles, getGallery, getLocalizedEvents, getNavigation, getPages, getSettings } from "../content";
+import { getArticles, getGallery, getLocalizedEvents, getNavigation, getPage, getPages, getSettings } from "../content";
 
 export async function getStaticPaths() {
   const pages = (await getPages("en")).filter((page) => page.slug !== "");
-  return pages.map((page) => ({ params: { slug: page.slug }, props: { page } }));
+  return pages.map((page) => ({ params: { slug: page.slug } }));
 }
 
-const { page } = Astro.props;
+const slug = Array.isArray(Astro.params.slug) ? Astro.params.slug.join("/") : Astro.params.slug ?? "";
+const page = await getPage("en", slug);
+if (!page) return Astro.redirect("/404.html", 302);
 const settings = await getSettings();
 const navigation = await getNavigation("en");
 const events = await getLocalizedEvents("en");
@@ -16,5 +18,5 @@ const articles = await getArticles("en");
 const galleryItems = await getGallery("en");
 ---
 <Layout page={page} settings={settings} navigation={navigation}>
-  <Blocks blocks={page.blocks} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} />
+  <Blocks blocks={page.blocks} layout={page.layout} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} />
 </Layout>
