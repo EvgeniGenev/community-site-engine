@@ -1,60 +1,37 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Production AWS infrastructure for Community Site Engine, including admin app, static site, and CodeBuild publishing pipeline.
+Description: Single-template production deployment for Community Site Engine.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Site
+        Parameters:
+          - SiteName
+          - AssetsZipS3Uri
+    ParameterLabels:
+      SiteName:
+        default: Site name
+      AssetsZipS3Uri:
+        default: Optional assets zip S3 URI
 
 Parameters:
-  ProjectName:
+  SiteName:
     Type: String
-    Default: s3cms
-  CmsContentBucketName:
-    Type: String
-    Description: Globally unique private S3 bucket for CMS JSON/media content.
-  PublicSiteBucketName:
-    Type: String
-    Description: Globally unique private S3 bucket for the public static site origin.
-  AdminSiteBucketName:
-    Type: String
-    Description: Globally unique private S3 bucket for the admin app origin.
-  ApiLambdaCodeS3Bucket:
-    Type: String
-    Description: S3 bucket containing the packaged CMS API Lambda zip.
-  ApiLambdaCodeS3Key:
-    Type: String
-    Description: S3 key for the packaged CMS API Lambda zip.
-  CodeBuildSourceLocation:
-    Type: String
-    Description: HTTPS repository URL for CodeBuild, for example https://github.com/ORG/REPO.git.
-  CodeBuildSourceVersion:
-    Type: String
-    Default: main
-    Description: Branch, tag, or commit for CodeBuild to build.
-  CmsContentPrefix:
+    Description: Short lowercase site name used as the prefix for every named AWS resource.
+    MinLength: 2
+    MaxLength: 16
+    AllowedPattern: "^[a-z][a-z0-9-]*[a-z0-9]$"
+    ConstraintDescription: Use 2-16 lowercase letters, numbers, and hyphens. Start with a letter and end with a letter or number.
+  AssetsZipS3Uri:
     Type: String
     Default: ""
-    Description: Optional prefix inside the CMS content bucket. Leave blank when content is at bucket root.
-  AdminAllowedOrigins:
-    Type: String
-    Description: Comma-separated admin app origins allowed by the CMS API CORS policy, for example https://admin.example.com.
-  CognitoCallbackUrls:
-    Type: CommaDelimitedList
-    Default: "http://localhost:5174"
-    Description: Cognito app client callback URLs. Update if/when a hosted UI login is added.
-  CognitoLogoutUrls:
-    Type: CommaDelimitedList
-    Default: "http://localhost:5174"
-    Description: Cognito app client logout URLs. Update if/when a hosted UI login is added.
-  MaxMediaBytes:
-    Type: Number
-    Default: 10485760
-  CodeBuildQueuedTimeoutMinutes:
-    Type: Number
-    Default: 30
-  PriceClass:
-    Type: String
-    Default: PriceClass_100
-    AllowedValues:
-      - PriceClass_100
-      - PriceClass_200
-      - PriceClass_All
+    Description: Optional s3://bucket/key.zip containing site content/assets. The zip may contain content/... or site-assets/content/... paths.
+    AllowedPattern: "^$|^s3://[^/]+/.+\\.zip$"
+    ConstraintDescription: Leave blank or provide an s3://bucket/key.zip URI.
+
+Conditions:
+  HasAssetsZip: !Not [!Equals [!Ref AssetsZipS3Uri, ""]]
 
 Resources:
   CmsContentBucket:
@@ -62,7 +39,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Ref CmsContentBucketName
+      BucketName: !Sub ${SiteName}-content-${AWS::Region}-${AWS::AccountId}
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -74,13 +51,16 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub ${SiteName}-content-${AWS::Region}-${AWS::AccountId}
 
   PublicSiteBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Ref PublicSiteBucketName
+      BucketName: !Sub ${SiteName}-public-${AWS::Region}-${AWS::AccountId}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -90,13 +70,16 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub ${SiteName}-public-${AWS::Region}-${AWS::AccountId}
 
   AdminSiteBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Ref AdminSiteBucketName
+      BucketName: !Sub ${SiteName}-admin-${AWS::Region}-${AWS::AccountId}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -106,12 +89,15 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub ${SiteName}-admin-${AWS::Region}-${AWS::AccountId}
 
   SiteOriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub ${ProjectName}-site-oac
+        Name: !Sub ${SiteName}-site-oac-${AWS::Region}-${AWS::AccountId}
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -120,7 +106,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub ${ProjectName}-admin-oac
+        Name: !Sub ${SiteName}-admin-oac-${AWS::Region}-${AWS::AccountId}
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -130,9 +116,9 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: !Sub ${ProjectName} public static site
+        Comment: !Sub ${SiteName}-site-cdn-${AWS::Region}-${AWS::AccountId}
         DefaultRootObject: index.html
-        PriceClass: !Ref PriceClass
+        PriceClass: PriceClass_100
         HttpVersion: http2and3
         Origins:
           - Id: site-origin
@@ -157,15 +143,18 @@ Resources:
           - ErrorCode: 404
             ResponseCode: 404
             ResponsePagePath: /404.html
+      Tags:
+        - Key: Name
+          Value: !Sub ${SiteName}-site-cdn-${AWS::Region}-${AWS::AccountId}
 
   AdminDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: !Sub ${ProjectName} CMS admin app
+        Comment: !Sub ${SiteName}-admin-cdn-${AWS::Region}-${AWS::AccountId}
         DefaultRootObject: index.html
-        PriceClass: !Ref PriceClass
+        PriceClass: PriceClass_100
         HttpVersion: http2and3
         Origins:
           - Id: admin-origin
@@ -190,6 +179,9 @@ Resources:
           - ErrorCode: 404
             ResponseCode: 200
             ResponsePagePath: /index.html
+      Tags:
+        - Key: Name
+          Value: !Sub ${SiteName}-admin-cdn-${AWS::Region}-${AWS::AccountId}
 
   PublicSiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -226,7 +218,7 @@ Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub ${ProjectName}-cms-users
+      UserPoolName: !Sub ${SiteName}-users-${AWS::Region}-${AWS::AccountId}
       UsernameAttributes:
         - email
       AutoVerifiedAttributes:
@@ -245,11 +237,13 @@ Resources:
           RequireUppercase: true
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
+      UserPoolTags:
+        Name: !Sub ${SiteName}-users-${AWS::Region}-${AWS::AccountId}
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: !Sub ${ProjectName}-cms-admin-client
+      ClientName: !Sub ${SiteName}-admin-client-${AWS::Region}-${AWS::AccountId}
       UserPoolId: !Ref UserPool
       GenerateSecret: false
       ExplicitAuthFlows:
@@ -257,8 +251,10 @@ Resources:
         - ALLOW_USER_SRP_AUTH
       SupportedIdentityProviders:
         - COGNITO
-      CallbackURLs: !Ref CognitoCallbackUrls
-      LogoutURLs: !Ref CognitoLogoutUrls
+      CallbackURLs:
+        - !Sub https://${AdminDistribution.DomainName}
+      LogoutURLs:
+        - !Sub https://${AdminDistribution.DomainName}
       AllowedOAuthFlowsUserPoolClient: true
       AllowedOAuthFlows:
         - code
@@ -270,6 +266,7 @@ Resources:
   ApiLambdaRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub ${SiteName}-api-role-${AWS::Region}-${AWS::AccountId}
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -280,7 +277,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: cms-api-access
+        - PolicyName: !Sub ${SiteName}-api-access-${AWS::Region}-${AWS::AccountId}
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -305,38 +302,42 @@ Resources:
               - Effect: Allow
                 Action:
                   - codebuild:StartBuild
-                Resource: !GetAtt StaticSiteBuildProject.Arn
+                Resource: !Sub arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${SiteName}-build-${AWS::Region}-${AWS::AccountId}
 
   ApiLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub ${ProjectName}-cms-api
+      FunctionName: !Sub ${SiteName}-api-${AWS::Region}-${AWS::AccountId}
       Runtime: nodejs22.x
-      Handler: lambda.handler
+      Handler: index.handler
       Role: !GetAtt ApiLambdaRole.Arn
       Timeout: 30
       MemorySize: 512
       Code:
-        S3Bucket: !Ref ApiLambdaCodeS3Bucket
-        S3Key: !Ref ApiLambdaCodeS3Key
+        ZipFile: |
+          exports.handler = async () => ({
+            statusCode: 503,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ error: "CMS API package has not been deployed yet." })
+          });
       Environment:
         Variables:
           STORAGE_MODE: s3
           CMS_CONTENT_BUCKET: !Ref CmsContentBucket
-          CMS_CONTENT_PREFIX: !Ref CmsContentPrefix
+          CMS_CONTENT_PREFIX: ""
           COGNITO_USER_POOL_ID: !Ref UserPool
           COGNITO_REGION: !Ref AWS::Region
           COGNITO_APP_CLIENT_ID: !Ref UserPoolClient
-          ADMIN_ALLOWED_ORIGINS: !Ref AdminAllowedOrigins
+          ADMIN_ALLOWED_ORIGINS: !Sub https://${AdminDistribution.DomainName}
           CMS_ALLOW_DEV_TOKENS: "false"
-          MAX_MEDIA_BYTES: !Ref MaxMediaBytes
-          CODEBUILD_PROJECT_NAME: !Ref StaticSiteBuildProject
-          CODEBUILD_QUEUED_TIMEOUT_MINUTES: !Ref CodeBuildQueuedTimeoutMinutes
+          MAX_MEDIA_BYTES: "10485760"
+          CODEBUILD_PROJECT_NAME: !Sub ${SiteName}-build-${AWS::Region}-${AWS::AccountId}
+          CODEBUILD_QUEUED_TIMEOUT_MINUTES: "30"
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Name: !Sub ${ProjectName}-cms-api
+      Name: !Sub ${SiteName}-http-api-${AWS::Region}-${AWS::AccountId}
       ProtocolType: HTTP
 
   HttpApiIntegration:
@@ -369,9 +370,126 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*
 
+  AssetSeederRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SiteName}-asset-seeder-role-${AWS::Region}-${AWS::AccountId}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub ${SiteName}-asset-seeder-access-${AWS::Region}-${AWS::AccountId}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt CmsContentBucket.Arn
+                  - !Sub ${CmsContentBucket.Arn}/*
+
+  AssetSeederFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${SiteName}-asset-seeder-${AWS::Region}-${AWS::AccountId}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt AssetSeederRole.Arn
+      Timeout: 900
+      MemorySize: 1024
+      Code:
+        ZipFile: |
+          import boto3
+          import io
+          import json
+          import re
+          import urllib.request
+          import zipfile
+
+          s3 = boto3.client("s3")
+
+          def respond(event, context, status, data=None, reason=None):
+              body = {
+                  "Status": status,
+                  "Reason": reason or f"See CloudWatch Log Stream: {context.log_stream_name}",
+                  "PhysicalResourceId": event.get("PhysicalResourceId") or "asset-seed",
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+                  "NoEcho": False,
+                  "Data": data or {},
+              }
+              payload = json.dumps(body).encode("utf-8")
+              req = urllib.request.Request(event["ResponseURL"], data=payload, method="PUT")
+              req.add_header("content-type", "")
+              req.add_header("content-length", str(len(payload)))
+              urllib.request.urlopen(req, timeout=30)
+
+          def normalize_key(name):
+              name = name.replace("\\", "/").lstrip("/")
+              for prefix in ("site-assets/content/", "content/"):
+                  if name.startswith(prefix):
+                      return name[len(prefix):]
+              return name
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] == "Delete":
+                      respond(event, context, "SUCCESS", {"Skipped": "Delete does not remove content"})
+                      return
+                  props = event["ResourceProperties"]
+                  uri = props["AssetsZipS3Uri"]
+                  if not uri:
+                      respond(event, context, "SUCCESS", {"Skipped": "No assets zip provided"})
+                      return
+                  dest_bucket = props["DestinationBucket"]
+                  match = re.match(r"^s3://([^/]+)/(.+)$", uri)
+                  if not match:
+                      raise ValueError("AssetsZipS3Uri must be an s3://bucket/key.zip URI")
+                  source_bucket, source_key = match.groups()
+                  obj = s3.get_object(Bucket=source_bucket, Key=source_key)
+                  data = obj["Body"].read()
+                  uploaded = 0
+                  with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                      for info in archive.infolist():
+                          if info.is_dir():
+                              continue
+                          key = normalize_key(info.filename)
+                          if not key or key.startswith("../") or "/../" in key:
+                              continue
+                          s3.put_object(Bucket=dest_bucket, Key=key, Body=archive.read(info))
+                          uploaded += 1
+                  respond(event, context, "SUCCESS", {"UploadedFiles": uploaded})
+              except Exception as exc:
+                  respond(event, context, "FAILED", reason=str(exc))
+
+  AssetSeed:
+    Type: Custom::AssetSeed
+    DependsOn:
+      - CmsContentBucket
+      - AssetSeederFunction
+    Properties:
+      ServiceToken: !GetAtt AssetSeederFunction.Arn
+      AssetsZipS3Uri: !Ref AssetsZipS3Uri
+      DestinationBucket: !Ref CmsContentBucket
+
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub ${SiteName}-build-role-${AWS::Region}-${AWS::AccountId}
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -380,7 +498,7 @@ Resources:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: static-site-build
+        - PolicyName: !Sub ${SiteName}-build-access-${AWS::Region}-${AWS::AccountId}
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -390,37 +508,50 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-static-site-build
-                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-static-site-build:*
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${SiteName}-build-${AWS::Region}-${AWS::AccountId}
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${SiteName}-build-${AWS::Region}-${AWS::AccountId}:*
               - Effect: Allow
                 Action:
                   - s3:ListBucket
                 Resource:
                   - !GetAtt CmsContentBucket.Arn
                   - !GetAtt PublicSiteBucket.Arn
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub ${CmsContentBucket.Arn}/*
+                  - !GetAtt AdminSiteBucket.Arn
               - Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:DeleteObject
-                Resource: !Sub ${PublicSiteBucket.Arn}/*
+                Resource:
+                  - !Sub ${CmsContentBucket.Arn}/*
+                  - !Sub ${PublicSiteBucket.Arn}/*
+                  - !Sub ${AdminSiteBucket.Arn}/*
               - Effect: Allow
                 Action:
                   - cloudfront:CreateInvalidation
-                Resource: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+                Resource:
+                  - !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+                  - !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${AdminDistribution}
+              - Effect: Allow
+                Action:
+                  - lambda:GetFunctionConfiguration
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                Resource: !GetAtt ApiLambda.Arn
 
   StaticSiteBuildProject:
     Type: AWS::CodeBuild::Project
+    DependsOn:
+      - PublicSiteBucketPolicy
+      - AdminSiteBucketPolicy
+      - ApiLambda
+      - HttpApiStage
     Properties:
-      Name: !Sub ${ProjectName}-static-site-build
-      Description: Build and deploy the Astro static site from CMS content in S3.
+      Name: !Sub ${SiteName}-build-${AWS::Region}-${AWS::AccountId}
+      Description: !Sub ${SiteName}-build-${AWS::Region}-${AWS::AccountId}
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       ConcurrentBuildLimit: 1
-      QueuedTimeoutInMinutes: !Ref CodeBuildQueuedTimeoutMinutes
+      QueuedTimeoutInMinutes: 30
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -429,26 +560,192 @@ Resources:
         Image: aws/codebuild/standard:7.0
         PrivilegedMode: false
         EnvironmentVariables:
+          - Name: REPOSITORY_URL
+            Type: PLAINTEXT
+            Value: https://github.com/EvgeniGenev/community-site-engine.git
+          - Name: SOURCE_VERSION
+            Type: PLAINTEXT
+            Value: main
           - Name: CMS_CONTENT_BUCKET
             Type: PLAINTEXT
             Value: !Ref CmsContentBucket
-          - Name: CMS_CONTENT_PREFIX
-            Type: PLAINTEXT
-            Value: !Ref CmsContentPrefix
           - Name: PUBLIC_SITE_BUCKET
             Type: PLAINTEXT
             Value: !Ref PublicSiteBucket
-          - Name: CLOUDFRONT_DISTRIBUTION_ID
+          - Name: ADMIN_SITE_BUCKET
+            Type: PLAINTEXT
+            Value: !Ref AdminSiteBucket
+          - Name: SITE_DISTRIBUTION_ID
             Type: PLAINTEXT
             Value: !Ref SiteDistribution
+          - Name: ADMIN_DISTRIBUTION_ID
+            Type: PLAINTEXT
+            Value: !Ref AdminDistribution
+          - Name: CMS_API_FUNCTION_NAME
+            Type: PLAINTEXT
+            Value: !Ref ApiLambda
+          - Name: CMS_API_ENDPOINT
+            Type: PLAINTEXT
+            Value: !GetAtt HttpApi.ApiEndpoint
       Source:
-        Type: GITHUB
-        Location: !Ref CodeBuildSourceLocation
-        BuildSpec: buildspec.yml
-      SourceVersion: !Ref CodeBuildSourceVersion
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 20
+              commands:
+                - git clone --depth 1 --branch "$SOURCE_VERSION" "$REPOSITORY_URL" source
+                - cd source
+                - npm ci
+            build:
+              commands:
+                - cd source
+                - npm --workspace packages/shared run build
+                - npm --workspace apps/cms-api run build
+                - mkdir -p /tmp/cms-api-lambda/packages/shared/dist
+                - cp -r apps/cms-api/dist/* /tmp/cms-api-lambda/
+                - cp packages/shared/package.json /tmp/cms-api-lambda/packages/shared/package.json
+                - cp -r packages/shared/dist/* /tmp/cms-api-lambda/packages/shared/dist/
+                - |
+                  cat > /tmp/cms-api-lambda/package.json <<'EOF'
+                  {
+                    "type": "module",
+                    "dependencies": {
+                      "@aws-sdk/client-codebuild": "^3.1040.0",
+                      "@aws-sdk/client-cognito-identity-provider": "^3.1039.0",
+                      "@aws-sdk/client-s3": "^3.946.0",
+                      "@community-site-engine/shared": "file:packages/shared",
+                      "@hono/node-server": "^1.19.6",
+                      "hono": "^4.10.6",
+                      "mime": "^4.1.0",
+                      "zod": "^4.1.12"
+                    }
+                  }
+                  EOF
+                - cd /tmp/cms-api-lambda
+                - npm install --omit=dev
+                - zip -qr /tmp/cms-api-lambda.zip .
+                - aws lambda update-function-configuration --function-name "$CMS_API_FUNCTION_NAME" --handler lambda.handler --runtime nodejs22.x
+                - aws lambda wait function-updated --function-name "$CMS_API_FUNCTION_NAME"
+                - aws lambda update-function-code --function-name "$CMS_API_FUNCTION_NAME" --zip-file fileb:///tmp/cms-api-lambda.zip
+                - aws lambda wait function-updated --function-name "$CMS_API_FUNCTION_NAME"
+                - cd "$CODEBUILD_SRC_DIR/source"
+                - |
+                  if ! aws s3 ls "s3://$CMS_CONTENT_BUCKET/" --recursive | head -n 1 | grep -q .; then
+                    aws s3 sync examples/site-assets/content "s3://$CMS_CONTENT_BUCKET/" --delete
+                  fi
+                - aws s3 sync "s3://$CMS_CONTENT_BUCKET/" site-assets/content --delete
+                - npm run seed:media
+                - VITE_CMS_API_URL="$CMS_API_ENDPOINT" npm --workspace apps/cms-admin run build
+                - aws s3 sync apps/cms-admin/dist "s3://$ADMIN_SITE_BUCKET/" --delete
+                - npm run build:site
+                - aws s3 sync apps/site/dist "s3://$PUBLIC_SITE_BUCKET/" --delete
+            post_build:
+              commands:
+                - aws cloudfront create-invalidation --distribution-id "$SITE_DISTRIBUTION_ID" --paths "/*"
+                - aws cloudfront create-invalidation --distribution-id "$ADMIN_DISTRIBUTION_ID" --paths "/*"
       LogsConfig:
         CloudWatchLogs:
           Status: ENABLED
+      Tags:
+        - Key: Name
+          Value: !Sub ${SiteName}-build-${AWS::Region}-${AWS::AccountId}
+
+  DeploymentRunnerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SiteName}-deploy-runner-role-${AWS::Region}-${AWS::AccountId}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub ${SiteName}-deploy-runner-access-${AWS::Region}-${AWS::AccountId}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource: !GetAtt StaticSiteBuildProject.Arn
+
+  DeploymentRunnerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${SiteName}-deploy-runner-${AWS::Region}-${AWS::AccountId}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt DeploymentRunnerRole.Arn
+      Timeout: 900
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import time
+          import urllib.request
+
+          codebuild = boto3.client("codebuild")
+
+          def respond(event, context, status, data=None, reason=None):
+              body = {
+                  "Status": status,
+                  "Reason": reason or f"See CloudWatch Log Stream: {context.log_stream_name}",
+                  "PhysicalResourceId": event.get("PhysicalResourceId") or "deployment-run",
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+                  "NoEcho": False,
+                  "Data": data or {},
+              }
+              payload = json.dumps(body).encode("utf-8")
+              req = urllib.request.Request(event["ResponseURL"], data=payload, method="PUT")
+              req.add_header("content-type", "")
+              req.add_header("content-length", str(len(payload)))
+              urllib.request.urlopen(req, timeout=30)
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] == "Delete":
+                      respond(event, context, "SUCCESS", {"Skipped": "Delete does not run a build"})
+                      return
+                  project = event["ResourceProperties"]["ProjectName"]
+                  started = codebuild.start_build(projectName=project)["build"]
+                  build_id = started["id"]
+                  deadline = time.time() + 840
+                  while time.time() < deadline:
+                      build = codebuild.batch_get_builds(ids=[build_id])["builds"][0]
+                      status = build["buildStatus"]
+                      if status == "SUCCEEDED":
+                          respond(event, context, "SUCCESS", {"BuildId": build_id})
+                          return
+                      if status in ("FAILED", "FAULT", "STOPPED", "TIMED_OUT"):
+                          respond(event, context, "FAILED", {"BuildId": build_id}, f"CodeBuild ended with {status}: {build_id}")
+                          return
+                      time.sleep(15)
+                  respond(event, context, "FAILED", {"BuildId": build_id}, f"Timed out waiting for CodeBuild: {build_id}")
+              except Exception as exc:
+                  respond(event, context, "FAILED", reason=str(exc))
+
+  InitialDeployment:
+    Type: Custom::InitialDeployment
+    DependsOn:
+      - AssetSeed
+      - StaticSiteBuildProject
+      - HttpApiStage
+    Properties:
+      ServiceToken: !GetAtt DeploymentRunnerFunction.Arn
+      ProjectName: !Ref StaticSiteBuildProject
+      RepositoryVersion: main
+      AssetsZipProvided: !If [HasAssetsZip, "true", "false"]
 
 Outputs:
   CmsContentBucket:
@@ -459,7 +756,7 @@ Outputs:
     Value: !Ref AdminSiteBucket
   PublicSiteCloudFrontDomain:
     Value: !GetAtt SiteDistribution.DomainName
-  AdminCloudFrontDomain:
+  AdminSiteCloudFrontDomain:
     Value: !GetAtt AdminDistribution.DomainName
   ApiEndpoint:
     Value: !GetAtt HttpApi.ApiEndpoint

@@ -94,6 +94,6 @@ After that, edit `site-assets/content` locally or through Admin and sync that pr
 ## Deployment Docs
 
 - `docs/IMPLEMENTATION.md`: architecture and security overview.
-- `docs/AWS_DEPLOYMENT.md`: CloudFormation deployment and operations runbook.
+- `docs/AWS_DEPLOYMENT.md`: single-template CloudFormation deployment and operations runbook.
 - `docs/MCP.md`: MCP setup and available tools.
 - `docs/COST.md`: low-traffic AWS cost notes.
