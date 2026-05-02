@@ -725,10 +725,12 @@ Resources:
               commands:
                 - git clone --depth 1 --branch "$SOURCE_VERSION" "$REPOSITORY_URL" source
                 - cd source
+                - n 22.13.1
+                - node --version
                 - npm ci
             build:
               commands:
-                - cd source
+                - cd "$CODEBUILD_SRC_DIR/source"
                 - npm --workspace packages/shared run build
                 - npm --workspace apps/cms-api run build
                 - mkdir -p /tmp/cms-api-lambda/packages/shared/dist
