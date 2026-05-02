@@ -682,7 +682,6 @@ function App() {
     name: "",
     role: "contributor",
     email: "",
-    token: "",
     temporaryPassword: "",
     suppressEmail: true
   });
@@ -914,15 +913,20 @@ function App() {
           })
         }
       );
-      if (result.source === "local") {
-        setMessage(`Reset local dev token for ${passwordResetDraft.id}: ${result.token}`);
-      } else {
-        setMessage(`Reset ${passwordResetDraft.id} password as ${result.temporary ? "temporary" : "permanent"}${result.password ? `: ${result.password}` : ""}`);
-      }
+      setMessage(`Reset ${passwordResetDraft.id} ${result.source === "local" ? "local access token" : "password"} as ${result.temporary ? "temporary" : "permanent"}.`);
       setPasswordResetDraft({ id: "", password: "", permanent: false });
       await loadUsers();
     } catch (error) {
       setMessage(`Could not reset password: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function sendManagedUserLoginEmail(id: string) {
+    try {
+      const result = await request<{ message: string }>(token, `/api/users/${encodeURIComponent(id)}/send-login-email`, { method: "POST" });
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(`Could not send login email: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -1361,14 +1365,6 @@ function App() {
             <>
               <p className="muted">Sign in with the site administrator account.</p>
               <button onClick={() => void startCognitoLogin()} disabled={authBusy}>{authBusy ? "Signing in..." : "Sign in with Cognito"}</button>
-              <details>
-                <summary>Use bearer token manually</summary>
-                <label>
-                  Access token
-                  <input value={token} onChange={(event) => setToken(event.target.value)} />
-                </label>
-                <button onClick={() => void refresh()}>Use Token</button>
-              </details>
             </>
           ) : (
             <>
@@ -1390,11 +1386,7 @@ function App() {
       <aside className="sidebar">
         <p className="kicker">Community Site Engine</p>
         <h1>Content Builder</h1>
-        <label>
-          Access token
-          <input value={token} onChange={(event) => setToken(event.target.value)} />
-        </label>
-        <button onClick={() => void refresh()}>Sign In / Refresh</button>
+        <button onClick={() => void refresh()}>Refresh</button>
         <button className="ghost" onClick={signOut}>Sign Out</button>
         <p className="status">{message}</p>
         <div className="roleBox">
@@ -1846,9 +1838,9 @@ function App() {
                     <span>{item.email}</span>
                     <span>{item.role}</span>
                     {item.status && <span>{item.status}</span>}
-                    {item.token && <code>{item.token}</code>}
                     <div className="actionsRow">
                       <button onClick={() => setUserDraft({ ...item, temporaryPassword: "", suppressEmail: true })}>Edit</button>
+                      <button onClick={() => void sendManagedUserLoginEmail(item.id)}>Send Login Email</button>
                       <button onClick={() => setPasswordResetDraft({ id: item.id, password: "", permanent: false })}>Reset Password</button>
                       <button className="danger" onClick={() => void deleteManagedUser(item.id)}>Delete</button>
                     </div>
@@ -1894,7 +1886,6 @@ function App() {
                   <option value="admin">Admin</option>
                 </select>
               </label>
-              <TextField label="Local token (local fallback only; optional)" value={userDraft.token} onChange={(token) => setUserDraft({ ...userDraft, token })} />
               <TextField label="Temporary password (Cognito create only; optional)" value={userDraft.temporaryPassword} onChange={(temporaryPassword) => setUserDraft({ ...userDraft, temporaryPassword })} />
               <label className="languageChoice">
                 <input
@@ -1909,7 +1900,7 @@ function App() {
               </label>
               <div className="actionsRow">
                 <button onClick={() => void saveManagedUser()} disabled={!userDraft.id || !userDraft.name}>Save User</button>
-                <button className="danger" onClick={() => setUserDraft({ id: "", name: "", role: "contributor", email: "", token: "", temporaryPassword: "", suppressEmail: true })}>Clear</button>
+                <button className="danger" onClick={() => setUserDraft({ id: "", name: "", role: "contributor", email: "", temporaryPassword: "", suppressEmail: true })}>Clear</button>
               </div>
             </div>
           </>

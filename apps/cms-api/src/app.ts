@@ -20,6 +20,8 @@ import {
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminGetUserCommand,
+  AdminResetUserPasswordCommand,
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
   CognitoIdentityProviderClient,
@@ -228,6 +230,34 @@ async function deleteManagedUser(id: string) {
   const users = (await readLocalUsers()).filter((user) => user.id !== id);
   await writeLocalUsers(users);
   return { source: "local", id };
+}
+
+async function sendManagedUserLoginEmail(id: string) {
+  if (cognito && config.cognitoUserPoolId) {
+    const existingUser = await cognito.send(new AdminGetUserCommand({
+      UserPoolId: config.cognitoUserPoolId,
+      Username: id
+    }));
+    if (existingUser.UserStatus === "FORCE_CHANGE_PASSWORD") {
+      await cognito.send(new AdminCreateUserCommand({
+        UserPoolId: config.cognitoUserPoolId,
+        Username: id,
+        MessageAction: "RESEND"
+      }));
+      return { source: "cognito", id, message: "Cognito invitation email sent." };
+    }
+    await cognito.send(new AdminResetUserPasswordCommand({
+      UserPoolId: config.cognitoUserPoolId,
+      Username: id
+    }));
+    return { source: "cognito", id, message: "Cognito password reset email sent." };
+  }
+
+  return {
+    source: "local",
+    id,
+    message: "Local token email delivery is not configured. Rotate the local token with Reset Password if needed."
+  };
 }
 
 function generatedPassword() {
@@ -679,6 +709,14 @@ app.post("/api/users/:id/reset-password", async (c) => {
   }
   const body = PasswordResetSchema.parse(await c.req.json());
   return c.json(await resetManagedUserPassword(c.req.param("id"), body));
+});
+
+app.post("/api/users/:id/send-login-email", async (c) => {
+  const user = c.get("user");
+  if (!can(user.role, "settings")) {
+    throw new HTTPException(403, { message: "Only admins can email login instructions" });
+  }
+  return c.json(await sendManagedUserLoginEmail(c.req.param("id")));
 });
 
 app.delete("/api/users/:id", async (c) => {
