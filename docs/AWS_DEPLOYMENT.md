@@ -66,6 +66,26 @@ If `AssetsZipS3Uri` is blank, the stack seeds the CMS content bucket from tracke
 
 ## Deploy The Stack
 
+## Deployment IAM Policy
+
+Attach [deployment-user-policy.json](../infra/deployment-user-policy.json) to the IAM user or role that performs the CloudFormation deployment.
+
+Create and attach as a managed policy:
+
+```powershell
+aws iam create-policy `
+  --policy-name CommunitySiteEngineDeploymentPolicy `
+  --policy-document file://infra/deployment-user-policy.json
+
+aws iam attach-user-policy `
+  --user-name YOUR_DEPLOYMENT_IAM_USER `
+  --policy-arn arn:aws:iam::ACCOUNT_ID:policy/CommunitySiteEngineDeploymentPolicy
+```
+
+This policy grants broad access to only the AWS services used by the template and bootstrap build: CloudFormation, S3, CloudFront, Cognito, Lambda, API Gateway, CodeBuild, CloudWatch Logs, IAM, and STS caller identity. It includes full IAM access because the template creates named roles, inline policies, service-role trust policies, and passes roles to Lambda and CodeBuild.
+
+After deployment is stable, use a separate lower-privilege operator role for routine content work. Content editors should use the Admin app, not AWS IAM.
+
 Generic example deployment:
 
 ```powershell

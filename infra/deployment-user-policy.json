@@ -1,0 +1,43 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFormationDeployment",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "InfrastructureServicesUsedByTemplate",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:*",
+        "cloudfront:*",
+        "cognito-idp:*",
+        "codebuild:*",
+        "lambda:*",
+        "logs:*",
+        "s3:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IamForNamedDeploymentRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadAccountContext",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
