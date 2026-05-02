@@ -683,7 +683,7 @@ function App() {
     role: "contributor",
     email: "",
     temporaryPassword: "",
-    suppressEmail: true
+    suppressEmail: false
   });
   const [passwordResetDraft, setPasswordResetDraft] = useState<{ id: string; password: string; permanent: boolean }>({
     id: "",
@@ -873,14 +873,16 @@ function App() {
 
   async function saveManagedUser() {
     try {
+      const normalizedId = userSource === "cognito" ? (userDraft.email || userDraft.id) : userDraft.id;
       const payload = {
         ...userDraft,
+        id: normalizedId,
         email: userDraft.email || undefined,
         temporaryPassword: userDraft.temporaryPassword || undefined
       };
-      await request(token, `/api/users/${encodeURIComponent(userDraft.id)}`, { method: "PUT", body: JSON.stringify(payload) });
-      setMessage(`Saved user ${userDraft.id}`);
-      setUserDraft({ id: "", name: "", role: "contributor", email: "", temporaryPassword: "", suppressEmail: true });
+      await request(token, `/api/users/${encodeURIComponent(normalizedId)}`, { method: "PUT", body: JSON.stringify(payload) });
+      setMessage(`Saved user ${normalizedId}`);
+      setUserDraft({ id: "", name: "", role: "contributor", email: "", temporaryPassword: "", suppressEmail: false });
       await loadUsers();
     } catch (error) {
       setMessage(`Could not save user: ${error instanceof Error ? error.message : String(error)}`);
@@ -1838,7 +1840,7 @@ function App() {
                     <span>{item.role}</span>
                     {item.status && <span>{item.status}</span>}
                     <div className="actionsRow">
-                      <button onClick={() => setUserDraft({ ...item, temporaryPassword: "", suppressEmail: true })}>Edit</button>
+                      <button onClick={() => setUserDraft({ ...item, temporaryPassword: "", suppressEmail: false })}>Edit</button>
                       <button onClick={() => void sendManagedUserLoginEmail(item.id)}>Send Login Email</button>
                       <button onClick={() => setPasswordResetDraft({ id: item.id, password: "", permanent: false })}>Reset Password</button>
                       <button className="danger" onClick={() => void deleteManagedUser(item.id)}>Delete</button>
@@ -1874,9 +1876,18 @@ function App() {
             )}
             <div className="builderCard">
               <h3>{userDraft.id ? "Add / Update User" : "Add User"}</h3>
-              <TextField label="Username / ID" value={userDraft.id} onChange={(id) => setUserDraft({ ...userDraft, id })} />
+              <TextField
+                label={userSource === "cognito" ? "Cognito username / ID (new users use email)" : "Username / ID"}
+                value={userDraft.id}
+                onChange={(id) => setUserDraft({ ...userDraft, id })}
+                disabled={userSource === "cognito" && !userDraft.id}
+              />
               <TextField label="Display name" value={userDraft.name} onChange={(name) => setUserDraft({ ...userDraft, name })} />
-              <TextField label="Email (Cognito)" value={userDraft.email} onChange={(email) => setUserDraft({ ...userDraft, email })} />
+              <TextField
+                label={userSource === "cognito" ? "Email (required)" : "Email (Cognito)"}
+                value={userDraft.email}
+                onChange={(email) => setUserDraft({ ...userDraft, email, id: userSource === "cognito" && !userDraft.id ? email : userDraft.id })}
+              />
               <label className="field">
                 <span>Role</span>
                 <select value={userDraft.role} onChange={(event) => setUserDraft({ ...userDraft, role: event.target.value as Role })}>
@@ -1894,12 +1905,12 @@ function App() {
                 />
                 <span>
                   <strong>Suppress Cognito invitation email</strong>
-                  <small>Useful for scripted setup. Leave unchecked when Cognito should email the user.</small>
+                  <small>Leave unchecked for normal user setup so Cognito emails the temporary password.</small>
                 </span>
               </label>
               <div className="actionsRow">
-                <button onClick={() => void saveManagedUser()} disabled={!userDraft.id || !userDraft.name}>Save User</button>
-                <button className="danger" onClick={() => setUserDraft({ id: "", name: "", role: "contributor", email: "", temporaryPassword: "", suppressEmail: true })}>Clear</button>
+                <button onClick={() => void saveManagedUser()} disabled={!(userSource === "cognito" ? userDraft.email : userDraft.id) || !userDraft.name}>Save User</button>
+                <button className="danger" onClick={() => setUserDraft({ id: "", name: "", role: "contributor", email: "", temporaryPassword: "", suppressEmail: false })}>Clear</button>
               </div>
             </div>
           </>

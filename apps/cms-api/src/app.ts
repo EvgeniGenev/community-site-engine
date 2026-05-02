@@ -136,6 +136,15 @@ const PasswordResetSchema = z.object({
   permanent: z.boolean().default(false)
 });
 
+function isEmail(value: string) {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+}
+
+function cognitoErrorMessage(error: unknown) {
+  const typed = error as { name?: string; message?: string };
+  return typed.message ? `${typed.name ?? "Cognito error"}: ${typed.message}` : "Cognito user operation failed";
+}
+
 app.onError((error, c) => {
   if (error instanceof z.ZodError) {
     return c.json({ message: "Validation failed", issues: error.issues }, 400);
@@ -187,29 +196,41 @@ async function listManagedUsers() {
 
 async function upsertManagedUser(input: z.infer<typeof ManagedUserInputSchema>) {
   if (cognito && config.cognitoUserPoolId) {
+    const username = input.email ?? input.id;
+    const email = input.email ?? (isEmail(input.id) ? input.id : undefined);
+    if (!email) {
+      throw new HTTPException(400, { message: "Email is required when creating users in Cognito." });
+    }
     const attributes = [
       { Name: "name", Value: input.name },
       { Name: "custom:role", Value: input.role },
-      ...(input.email ? [{ Name: "email", Value: input.email }, { Name: "email_verified", Value: "true" }] : [])
+      { Name: "email", Value: email },
+      { Name: "email_verified", Value: "true" }
     ];
     try {
       await cognito.send(new AdminCreateUserCommand({
         UserPoolId: config.cognitoUserPoolId,
-        Username: input.id,
+        Username: username,
         TemporaryPassword: input.temporaryPassword,
         MessageAction: input.suppressEmail ? "SUPPRESS" : undefined,
         UserAttributes: attributes
       }));
     } catch (error) {
       const name = (error as { name?: string }).name;
-      if (name !== "UsernameExistsException") throw error;
-      await cognito.send(new AdminUpdateUserAttributesCommand({
-        UserPoolId: config.cognitoUserPoolId,
-        Username: input.id,
-        UserAttributes: attributes
-      }));
+      if (name !== "UsernameExistsException") {
+        throw new HTTPException(400, { message: cognitoErrorMessage(error) });
+      }
+      try {
+        await cognito.send(new AdminUpdateUserAttributesCommand({
+          UserPoolId: config.cognitoUserPoolId,
+          Username: input.id,
+          UserAttributes: attributes
+        }));
+      } catch (updateError) {
+        throw new HTTPException(400, { message: cognitoErrorMessage(updateError) });
+      }
     }
-    return { source: "cognito", user: { id: input.id, name: input.name, email: input.email, role: input.role } };
+    return { source: "cognito", user: { id: username, name: input.name, email, role: input.role } };
   }
 
   const users = await readLocalUsers();
