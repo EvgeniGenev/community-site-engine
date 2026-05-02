@@ -26,7 +26,7 @@ The stack creates resources in this order:
 6. Placeholder CMS API Lambda and HTTP API Gateway.
 7. Optional asset seeder for `AssetsZipS3Uri`.
 8. CodeBuild project.
-9. Initial deployment runner that builds and deploys API, Admin, and public site.
+9. Initial deployment runner that starts the first CodeBuild deployment.
 
 The initial CodeBuild run clones:
 
@@ -102,6 +102,12 @@ Important outputs:
 - `CognitoUserPoolId`
 - `CognitoAppClientId`
 - `CodeBuildProjectName`
+
+The CloudFormation stack starts the initial CodeBuild deployment but does not wait for the full build to finish. After stack creation completes, check the CodeBuild build status before opening the public site or Admin app.
+
+```powershell
+aws codebuild list-builds-for-project --project-name CODEBUILD_PROJECT_NAME_FROM_OUTPUT
+```
 
 ## Create Initial Admin User
 

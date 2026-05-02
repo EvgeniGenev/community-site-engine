@@ -512,6 +512,7 @@ Resources:
                   - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${SiteName}-build-${AWS::Region}-${AWS::AccountId}:*
               - Effect: Allow
                 Action:
+                  - s3:GetBucketLocation
                   - s3:ListBucket
                 Resource:
                   - !GetAtt CmsContentBucket.Arn
@@ -674,7 +675,6 @@ Resources:
               - Effect: Allow
                 Action:
                   - codebuild:StartBuild
-                  - codebuild:BatchGetBuilds
                 Resource: !GetAtt StaticSiteBuildProject.Arn
 
   DeploymentRunnerFunction:
@@ -690,7 +690,6 @@ Resources:
         ZipFile: |
           import boto3
           import json
-          import time
           import urllib.request
 
           codebuild = boto3.client("codebuild")
@@ -719,19 +718,7 @@ Resources:
                       return
                   project = event["ResourceProperties"]["ProjectName"]
                   started = codebuild.start_build(projectName=project)["build"]
-                  build_id = started["id"]
-                  deadline = time.time() + 840
-                  while time.time() < deadline:
-                      build = codebuild.batch_get_builds(ids=[build_id])["builds"][0]
-                      status = build["buildStatus"]
-                      if status == "SUCCEEDED":
-                          respond(event, context, "SUCCESS", {"BuildId": build_id})
-                          return
-                      if status in ("FAILED", "FAULT", "STOPPED", "TIMED_OUT"):
-                          respond(event, context, "FAILED", {"BuildId": build_id}, f"CodeBuild ended with {status}: {build_id}")
-                          return
-                      time.sleep(15)
-                  respond(event, context, "FAILED", {"BuildId": build_id}, f"Timed out waiting for CodeBuild: {build_id}")
+                  respond(event, context, "SUCCESS", {"BuildId": started["id"], "Status": "STARTED"})
               except Exception as exc:
                   respond(event, context, "FAILED", reason=str(exc))
 
