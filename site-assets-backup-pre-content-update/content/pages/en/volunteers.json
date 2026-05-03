@@ -1,0 +1,37 @@
+{
+  "id": "volunteers",
+  "locale": "en",
+  "status": "published",
+  "title": "Volunteers",
+  "slug": "volunteers",
+  "translationKey": "volunteers",
+  "seo": {
+    "title": "Volunteers",
+    "description": "Sample volunteer page."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Volunteer",
+      "body": "Invite people to help with events, translation, setup, outreach, and projects.",
+      "image": {
+        "src": "/media/gallery/community-youth.svg",
+        "alt": "Young people creating posters",
+        "caption": "Youth volunteer team",
+        "description": "Illustration of young volunteers making community posters."
+      },
+      "actions": [
+        {
+          "label": "Contact Us",
+          "href": "/contact-us/",
+          "variant": "primary"
+        }
+      ]
+    },
+    {
+      "type": "richText",
+      "title": "Ways to help",
+      "body": "- Welcome guests at events\n- Help set up and clean up\n- Take photos for the gallery\n- Write short news updates\n- Translate community announcements"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "community-garden-day",
+  "status": "published",
+  "title": "Community Garden Day",
+  "slug": "community-garden-day",
+  "startsAt": "2026-05-23T09:00:00-07:00",
+  "endsAt": "2026-05-23T12:00:00-07:00",
+  "locationName": "Shared Garden Plot",
+  "address": "456 Park Lane",
+  "image": {
+    "src": "/media/gallery/community-garden.svg",
+    "alt": "Volunteers planting flowers",
+    "caption": "Community garden day",
+    "description": "Illustration of volunteers planting flowers and vegetables together."
+  },
+  "description": "Help plant seasonal flowers and vegetables, then share a simple lunch with volunteers.",
+  "notes": "Bring gloves if you have them.",
+  "translations": {
+    "bg": {
+      "title": "Ден в общностната градина",
+      "locationName": "Обща градина",
+      "address": "Парк Лейн 456",
+      "description": "Помогнете със засаждането на сезонни цветя и зеленчуци, след което споделете обяд с доброволците.",
+      "notes": "Носете ръкавици, ако имате."
+    }
+  }
+}

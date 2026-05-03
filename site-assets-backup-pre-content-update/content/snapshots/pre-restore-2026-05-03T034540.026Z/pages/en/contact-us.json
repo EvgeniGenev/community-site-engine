@@ -1,0 +1,49 @@
+{
+  "id": "contact-us",
+  "locale": "en",
+  "status": "published",
+  "title": "Contact Us",
+  "slug": "contact-us",
+  "translationKey": "contact-us",
+  "seo": {
+    "title": "Contact Us",
+    "description": "Sample contact page."
+  },
+  "layout": {
+    "columns": [
+      {
+        "id": "main",
+        "label": "Main",
+        "width": 40
+      },
+      {
+        "id": "side",
+        "label": "Right",
+        "width": 60
+      }
+    ]
+  },
+  "blocks": [
+    {
+      "type": "richText",
+      "title": "Sample contact details",
+      "body": "Email: hello@example.org\n\nMeeting location: Community room, local library, or another public venue.\n\nResponse time: Please allow two business days for replies.",
+      "layoutColumn": "main"
+    },
+    {
+      "type": "cardGrid",
+      "title": "New cardGrid",
+      "cards": [
+        {
+          "title": "New card 1",
+          "body": "Card text 1"
+        },
+        {
+          "title": "New card 2",
+          "body": "Card text 2"
+        }
+      ],
+      "layoutColumn": "side"
+    }
+  ]
+}

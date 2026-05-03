@@ -1,0 +1,21 @@
+{
+  "id": "how-to-volunteer-this-month",
+  "locale": "en",
+  "status": "published",
+  "title": "How to volunteer this month",
+  "slug": "how-to-volunteer-this-month",
+  "date": "2026-05-08",
+  "category": "Volunteers",
+  "excerpt": "A sample volunteer article with practical next steps.",
+  "featuredImage": {
+    "src": "/media/gallery/community-youth.svg",
+    "alt": "Young people creating posters",
+    "caption": "Youth volunteer team",
+    "description": "Illustration of young volunteers making community posters."
+  },
+  "body": "Volunteers can help with event setup, welcome tables, translation, photography, cleanup, and outreach.\n\nUse this format to give clear instructions, dates, and contact details.",
+  "seo": {
+    "title": "How to volunteer this month",
+    "description": "Example volunteer article."
+  }
+}

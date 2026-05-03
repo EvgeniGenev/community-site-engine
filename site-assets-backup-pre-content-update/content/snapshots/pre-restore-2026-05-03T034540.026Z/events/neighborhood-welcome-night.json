@@ -1,0 +1,27 @@
+{
+  "id": "neighborhood-welcome-night",
+  "status": "published",
+  "title": "Neighborhood Welcome Night",
+  "slug": "neighborhood-welcome-night",
+  "startsAt": "2026-05-15T18:00:00-07:00",
+  "endsAt": "2026-05-15T20:00:00-07:00",
+  "locationName": "Community Room",
+  "address": "123 Main Street",
+  "image": {
+    "src": "/media/gallery/community-welcome.svg",
+    "alt": "Neighbors meeting in a community hall",
+    "caption": "A welcoming community gathering",
+    "description": "Illustration of neighbors sharing ideas in a bright community room."
+  },
+  "description": "A casual evening for neighbors to meet, ask questions, and learn about upcoming programs.",
+  "notes": "Light refreshments provided.",
+  "translations": {
+    "bg": {
+      "title": "Вечер за добре дошли",
+      "locationName": "Общностна зала",
+      "address": "ул. Главна 123",
+      "description": "Неформална вечер, в която съседите могат да се запознаят и да научат за предстоящи програми.",
+      "notes": "Ще има леки почерпки."
+    }
+  }
+}

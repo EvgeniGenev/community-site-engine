@@ -1,0 +1,26 @@
+{
+  "id": "news-articles",
+  "locale": "en",
+  "status": "published",
+  "title": "News & Articles",
+  "slug": "news-articles",
+  "translationKey": "news-articles",
+  "seo": {
+    "title": "News & Articles",
+    "description": "Sample community news and articles."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "News & Articles",
+      "body": "Read sample announcements and community stories.",
+      "actions": []
+    },
+    {
+      "type": "articleList",
+      "title": "Latest Posts",
+      "intro": "Published articles are displayed here.",
+      "articleIds": []
+    }
+  ]
+}

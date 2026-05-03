@@ -1,0 +1,20 @@
+[
+  {
+    "id": "admin",
+    "name": "Admin",
+    "role": "admin",
+    "token": "dev-admin-token"
+  },
+  {
+    "id": "designer",
+    "name": "Designer",
+    "role": "designer",
+    "token": "dev-designer-token"
+  },
+  {
+    "id": "contributor",
+    "name": "Contributor",
+    "role": "contributor",
+    "token": "dev-contributor-token"
+  }
+]

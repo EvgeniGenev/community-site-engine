@@ -1,6 +1,8 @@
 node_modules/
 site-assets/
 site-assets-private-backup-*/
+/scratch/
+/scripts/
 dist/
 apps/site/dist/
 apps/cms-admin/dist/

@@ -38,7 +38,8 @@ function safeMarkdownHref(value: string) {
 }
 
 function inlineMarkdown(value: string) {
-  return escapeHtml(value)
+  return value
+    .replace(/&(?![a-zA-Z0-9#]+;)/g, "&amp;")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) => {
@@ -199,16 +200,36 @@ const eventScripts: string[] = [];
       <section class="section events-calendar-shell" data-events-root={eventsId} data-events={JSON.stringify(calendarEvents)} data-time-zone={eventTimeZone} style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         {block.intro && <p class="section-intro">{block.intro}</p>}
-        <div class="events-workspace">
-          <aside class="calendar-panel">
-            <div class="calendar-toolbar">
-              <button type="button" data-calendar-prev>Prev</button>
-              <strong data-calendar-title></strong>
-              <button type="button" data-calendar-next>Next</button>
-              <button type="button" data-calendar-today>Current</button>
+        {block.showCalendar !== false ? (
+          <div class="events-workspace">
+            <aside class="calendar-panel">
+              <div class="calendar-toolbar">
+                <button type="button" data-calendar-prev>Prev</button>
+                <strong data-calendar-title></strong>
+                <button type="button" data-calendar-next>Next</button>
+                <button type="button" data-calendar-today>Current</button>
+              </div>
+              <div class="calendar-grid" data-calendar-grid aria-label="Events calendar"></div>
+            </aside>
+            <div class="event-list" data-event-list>
+            {selectedEvents.map((event) => (
+              <article class="event-card" data-event-card data-date={eventDateKey(event.startsAt)}>
+                <div class="date-box">
+                  <span>{datePart(event.startsAt, "month", { month: "short", day: "2-digit" })}</span>
+                  <strong>{Number(datePart(event.startsAt, "day", { month: "short", day: "2-digit" }))}</strong>
+                </div>
+                <div>
+                  <h3>{event.title}</h3>
+                  <p class="meta">{formatDate(event.startsAt)}{event.address ? ` · ${event.address}` : ""}</p>
+                  <p>{event.description}</p>
+                  {event.notes && <p><strong>Note:</strong> {event.notes}</p>}
+                </div>
+              </article>
+            ))}
+              <p class="empty-events" data-empty-events hidden>No events scheduled for this date.</p>
             </div>
-            <div class="calendar-grid" data-calendar-grid aria-label="Events calendar"></div>
-          </aside>
+          </div>
+        ) : (
           <div class="event-list" data-event-list>
           {selectedEvents.map((event) => (
             <article class="event-card" data-event-card data-date={eventDateKey(event.startsAt)}>
@@ -224,9 +245,8 @@ const eventScripts: string[] = [];
               </div>
             </article>
           ))}
-            <p class="empty-events" data-empty-events hidden>No events scheduled for this date.</p>
           </div>
-        </div>
+        )}
       </section>
     );
   }

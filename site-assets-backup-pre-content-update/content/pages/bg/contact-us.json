@@ -1,0 +1,47 @@
+{
+  "id": "contact-us",
+  "locale": "bg",
+  "status": "published",
+  "title": "Contact Us (BG)",
+  "slug": "contact-us",
+  "translationKey": "contact-us",
+  "seo": {
+    "title": "Contact Us (BG)",
+    "description": "Sample contact page."
+  },
+  "layout": {
+    "columns": [
+      {
+        "id": "main",
+        "label": "Main",
+        "width": 40
+      },
+      {
+        "id": "side",
+        "label": "Right",
+        "width": 60
+      }
+    ]
+  },
+  "blocks": [
+    {
+      "type": "richText",
+      "title": "Sample contact details",
+      "body": "Email: hello@example.org\n\nMeeting location: Community room, local library, or another public venue.\n\nResponse time: Please allow two business days for replies.",
+      "layoutColumn": "main"
+    },
+    {
+      "type": "hero",
+      "title": "Contact Us",
+      "body": "Use this page for your public email, meeting location, and inquiry instructions.",
+      "actions": [
+        {
+          "label": "Email the Team",
+          "href": "mailto:hello@example.org",
+          "variant": "primary"
+        }
+      ],
+      "layoutColumn": "side"
+    }
+  ]
+}

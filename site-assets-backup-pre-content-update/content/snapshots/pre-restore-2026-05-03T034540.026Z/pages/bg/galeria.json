@@ -1,0 +1,26 @@
+{
+  "id": "gallery",
+  "locale": "bg",
+  "status": "published",
+  "title": "Галерия",
+  "slug": "galeria",
+  "translationKey": "gallery",
+  "seo": {
+    "title": "Галерия",
+    "description": "Галерия - примерна страница за общностен сайт."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Галерия",
+      "body": "Примерен визуален архив за програми и събития.",
+      "actions": []
+    },
+    {
+      "type": "gallery",
+      "title": "Общностни моменти",
+      "intro": "Снимките се редактират от административната галерия.",
+      "items": []
+    }
+  ]
+}

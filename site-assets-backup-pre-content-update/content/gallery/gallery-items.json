@@ -1,0 +1,110 @@
+[
+  {
+    "id": "welcome",
+    "status": "published",
+    "tags": [
+      "welcome"
+    ],
+    "src": "/media/gallery/community-welcome.svg",
+    "alt": "Neighbors meeting in a community hall",
+    "caption": "A welcoming community gathering",
+    "description": "Illustration of neighbors sharing ideas in a bright community room.",
+    "translations": {
+      "bg": {
+        "alt": "Съседи се срещат в общностна зала",
+        "caption": "Приветлива общностна среща",
+        "description": "Илюстрация на съседи, които споделят идеи в светла зала."
+      }
+    }
+  },
+  {
+    "id": "garden",
+    "status": "published",
+    "tags": [
+      "volunteers"
+    ],
+    "src": "/media/gallery/community-garden.svg",
+    "alt": "Volunteers planting flowers",
+    "caption": "Community garden day",
+    "description": "Illustration of volunteers planting flowers and vegetables together.",
+    "translations": {
+      "bg": {
+        "alt": "Доброволци засаждат цветя",
+        "caption": "Ден в общностната градина",
+        "description": "Илюстрация на доброволци, които засаждат цветя и зеленчуци."
+      }
+    }
+  },
+  {
+    "id": "workshop",
+    "status": "published",
+    "tags": [
+      "learning"
+    ],
+    "src": "/media/gallery/community-workshop.svg",
+    "alt": "People attending a workshop",
+    "caption": "Skills workshop",
+    "description": "Illustration of a small group learning together at tables.",
+    "translations": {
+      "bg": {
+        "alt": "Хора участват в работилница",
+        "caption": "Работилница за умения",
+        "description": "Илюстрация на малка група, която учи заедно."
+      }
+    }
+  },
+  {
+    "id": "music",
+    "status": "published",
+    "tags": [
+      "culture"
+    ],
+    "src": "/media/gallery/community-music.svg",
+    "alt": "Musicians performing at a neighborhood event",
+    "caption": "Music in the park",
+    "description": "Illustration of a friendly outdoor music event.",
+    "translations": {
+      "bg": {
+        "alt": "Музиканти свирят на квартално събитие",
+        "caption": "Музика в парка",
+        "description": "Илюстрация на приятелско музикално събитие."
+      }
+    }
+  },
+  {
+    "id": "picnic",
+    "status": "published",
+    "tags": [
+      "families"
+    ],
+    "src": "/media/gallery/community-picnic.svg",
+    "alt": "Families sharing food at a picnic",
+    "caption": "Neighborhood picnic",
+    "description": "Illustration of people sharing food and conversation outdoors.",
+    "translations": {
+      "bg": {
+        "alt": "Семейства споделят храна на пикник",
+        "caption": "Квартален пикник",
+        "description": "Илюстрация на хора, които споделят храна и разговори."
+      }
+    }
+  },
+  {
+    "id": "youth",
+    "status": "published",
+    "tags": [
+      "youth"
+    ],
+    "src": "/media/gallery/community-youth.svg",
+    "alt": "Young people creating posters",
+    "caption": "Youth volunteer team",
+    "description": "Illustration of young volunteers making community posters.",
+    "translations": {
+      "bg": {
+        "alt": "Млади хора изработват плакати",
+        "caption": "Младежки доброволчески екип",
+        "description": "Илюстрация на млади доброволци, които правят общностни плакати."
+      }
+    }
+  }
+]

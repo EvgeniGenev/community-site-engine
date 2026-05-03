@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-label="Youth Team">
+  <rect width="1200" height="800" fill="#faf5ff"/>
+  <circle cx="1010" cy="150" r="170" fill="#9f7aea" opacity="0.35"/>
+  <circle cx="180" cy="680" r="230" fill="#9f7aea" opacity="0.22"/>
+  <rect x="120" y="170" width="960" height="460" rx="42" fill="#ffffff" opacity="0.82"/>
+  <text x="170" y="350" font-family="serif" font-size="70" fill="#44337a">Youth Team</text>
+  <text x="172" y="430" font-family="Arial, sans-serif" font-size="34" fill="#4a5568">Young volunteers building community</text>
+  <path d="M170 500 C280 450, 350 570, 470 520 S690 480, 790 540 S950 545, 1030 480" fill="none" stroke="#9f7aea" stroke-width="18" stroke-linecap="round"/>
+</svg>

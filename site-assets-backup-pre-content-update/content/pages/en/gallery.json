@@ -1,0 +1,26 @@
+{
+  "id": "gallery",
+  "locale": "en",
+  "status": "published",
+  "title": "Gallery",
+  "slug": "gallery",
+  "translationKey": "gallery",
+  "seo": {
+    "title": "Gallery",
+    "description": "Sample community gallery."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Gallery",
+      "body": "A sample visual archive for programs and events.",
+      "actions": []
+    },
+    {
+      "type": "gallery",
+      "title": "Community Moments",
+      "intro": "Images are editable from the admin gallery screen.",
+      "items": []
+    }
+  ]
+}

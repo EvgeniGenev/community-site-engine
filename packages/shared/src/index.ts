@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { parse as parseCss } from "css-tree";
 import { FONT_OPTIONS, fontSupportsLanguages, type FontId, type FontSettings } from "./fonts.js";
 
@@ -199,7 +199,7 @@ const CustomCssSchema = {
 export const HeroBlockSchema = z.object({
   type: z.literal("hero"),
   eyebrow: z.string().optional(),
-  title: z.string().min(1),
+  title: z.string().optional(),
   body: z.string().optional(),
   image: MediaRefSchema.optional(),
   actions: z.array(LinkSchema).default([]),
@@ -241,6 +241,7 @@ export const EventListBlockSchema = z.object({
   title: z.string().optional(),
   intro: z.string().optional(),
   eventIds: z.array(z.string()).default([]),
+  showCalendar: z.boolean().default(true).optional(),
   ...CustomCssSchema
 });
 
@@ -254,7 +255,7 @@ export const ArticleListBlockSchema = z.object({
 
 export const CtaBlockSchema = z.object({
   type: z.literal("cta"),
-  title: z.string().min(1),
+  title: z.string().optional(),
   body: z.string().optional(),
   actions: z.array(LinkSchema).default([]),
   ...CustomCssSchema

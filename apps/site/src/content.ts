@@ -53,7 +53,15 @@ async function readJson<T>(path: string, parser: { parse(value: unknown): T }): 
 async function listJson<T>(path: string, parser: { parse(value: unknown): T }): Promise<T[]> {
   const dir = join(contentRoot, path);
   const files = (await readdir(dir).catch(() => [])).filter((file) => file.endsWith(".json"));
-  return Promise.all(files.map((file) => readJson(`${path}/${file}`, parser)));
+  const results: T[] = [];
+  for (const file of files) {
+    try {
+      results.push(await readJson(`${path}/${file}`, parser));
+    } catch (e) {
+      console.error(`Error parsing ${path}/${file}:`, e);
+    }
+  }
+  return results;
 }
 
 export async function getSettings(): Promise<SiteSettings> {

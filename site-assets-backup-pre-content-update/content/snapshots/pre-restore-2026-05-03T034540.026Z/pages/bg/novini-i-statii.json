@@ -1,0 +1,26 @@
+{
+  "id": "news-articles",
+  "locale": "bg",
+  "status": "published",
+  "title": "Новини и статии",
+  "slug": "novini-i-statii",
+  "translationKey": "news-articles",
+  "seo": {
+    "title": "Новини и статии",
+    "description": "Новини и статии - примерна страница за общностен сайт."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "title": "Новини и статии",
+      "body": "Прочете примерни съобщения и общностни истории.",
+      "actions": []
+    },
+    {
+      "type": "articleList",
+      "title": "Последни публикации",
+      "intro": "Публикуваните статии се показват тук.",
+      "articleIds": []
+    }
+  ]
+}
