@@ -818,6 +818,87 @@ function localizedArticle(baseArticle: Article, locale: string): Article {
   });
 }
 
+export function syncLocalizedPage(basePage: Page, existingPage: Page): Page {
+  return PageSchema.parse({
+    ...basePage,
+    locale: existingPage.locale,
+    title: existingPage.title,
+    seo: existingPage.seo,
+    blocks: basePage.blocks.map((baseBlock, index) => {
+      const existingBlock = existingPage.blocks[index];
+      if (existingBlock && existingBlock.type === baseBlock.type) {
+        const merged = { ...baseBlock };
+        const textFields = ["title", "body", "intro", "eyebrow"] as const;
+        for (const field of textFields) {
+          if (field in existingBlock && field in merged && (existingBlock as any)[field]) {
+            (merged as any)[field] = (existingBlock as any)[field];
+          }
+        }
+        if (baseBlock.type === "cardGrid" && existingBlock.type === "cardGrid") {
+          (merged as any).cards = baseBlock.cards.map((card, i) => {
+            const existingCard = existingBlock.cards[i];
+            if (existingCard) {
+              return { ...card, title: existingCard.title || card.title, body: existingCard.body || card.body };
+            }
+            return card;
+          });
+        }
+        if ((baseBlock.type === "hero" && existingBlock.type === "hero") || 
+            (baseBlock.type === "cta" && existingBlock.type === "cta")) {
+          (merged as any).actions = (baseBlock as any).actions.map((action: any, i: number) => {
+            const existingAction = (existingBlock as any).actions[i];
+            if (existingAction) {
+              return { ...action, label: existingAction.label || action.label };
+            }
+            return action;
+          });
+        }
+        return merged;
+      }
+      return baseBlock;
+    })
+  });
+}
+
+export function syncLocalizedArticle(baseArticle: Article, existingArticle: Article): Article {
+  return ArticleSchema.parse({
+    ...baseArticle,
+    locale: existingArticle.locale,
+    title: existingArticle.title,
+    excerpt: existingArticle.excerpt,
+    body: existingArticle.body,
+    seo: existingArticle.seo
+  });
+}
+
+export function syncEventStrings(event: Event, locales: string[]): Event {
+  const synced = { ...event, translations: { ...event.translations } };
+  const textFields = ["title", "locationName", "address", "description", "notes"] as const;
+
+  for (const field of textFields) {
+    let bestValue = synced[field];
+    if (!bestValue) {
+      for (const locale of locales) {
+        if (synced.translations[locale]?.[field]) {
+          bestValue = synced.translations[locale]![field];
+          break;
+        }
+      }
+    }
+
+    if (bestValue) {
+      if (!synced[field]) synced[field] = bestValue;
+      for (const locale of locales) {
+        if (locale === "en") continue;
+        if (!synced.translations[locale]) synced.translations[locale] = {};
+        if (!synced.translations[locale]![field]) synced.translations[locale]![field] = bestValue;
+      }
+    }
+  }
+
+  return synced;
+}
+
 async function writeLocalizedObject(collection: "pages" | "articles", key: string, body: unknown) {
   const data = collection === "pages" ? PageSchema.parse(body) : ArticleSchema.parse(body);
   const languages = await supportedLanguageCodes();
@@ -826,10 +907,21 @@ async function writeLocalizedObject(collection: "pages" | "articles", key: strin
   await storage.put(key, `${JSON.stringify(data, null, 2)}\n`);
 
   for (const locale of languages) {
-    const localized = collection === "pages" ? localizedPage(data as Page, locale) : localizedArticle(data as Article, locale);
-    const siblingKey = `${collection}/${locale}/${localized.slug}.json`;
-    const exists = siblingKey === key || Boolean(await readJson(storage, siblingKey));
-    if (exists) continue;
+    if (locale === data.locale) continue;
+    const siblingKey = `${collection}/${locale}/${data.slug}.json`;
+    const existingRaw = await readJson(storage, siblingKey);
+    let localized;
+
+    if (existingRaw) {
+      if (collection === "pages") {
+        localized = syncLocalizedPage(data as Page, existingRaw as Page);
+      } else {
+        localized = syncLocalizedArticle(data as Article, existingRaw as Article);
+      }
+    } else {
+      localized = collection === "pages" ? localizedPage(data as Page, locale) : localizedArticle(data as Article, locale);
+    }
+    
     await storage.put(siblingKey, `${JSON.stringify(localized, null, 2)}\n`);
     created.push({ key: siblingKey, data: localized });
   }
@@ -1004,7 +1096,12 @@ app.put("/api/object/:collection/*", async (c) => {
   if (collection === "pages" || collection === "articles") {
     return c.json(await writeLocalizedObject(collection, key, body));
   }
-  const data = await writeValidated(storage, collection, key, body);
+  let parsedBody = body;
+  if (collection === "events") {
+    const languages = await supportedLanguageCodes();
+    parsedBody = syncEventStrings(EventSchema.parse(body), languages);
+  }
+  const data = await writeValidated(storage, collection, key, parsedBody);
   return c.json({ key, data });
 });
 
@@ -1095,11 +1192,11 @@ app.post("/api/media", async (c) => {
   }
   const body = z
     .object({
-        filename: z.string().min(1),
-        contentType: z.string().min(1),
-        base64: z.string().min(1),
-        folder: z.enum(["gallery", "events", "articles", "settings"]).default("gallery")
-      })
+      filename: z.string().min(1),
+      contentType: z.string().min(1),
+      base64: z.string().min(1),
+      folder: z.enum(["gallery", "events", "articles", "settings"]).default("gallery")
+    })
     .parse(await c.req.json());
   const safeName = body.filename.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
   const key = `media/${body.folder}/${Date.now()}-${safeName}`;
