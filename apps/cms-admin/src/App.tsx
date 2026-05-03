@@ -1154,17 +1154,29 @@ function App() {
         const err = await response.json().catch(() => ({ message: `HTTP ${response.status}` })) as { message?: string };
         throw new Error(err.message ?? `HTTP ${response.status}`);
       }
-      const blob = await response.blob();
-      const disposition = response.headers.get("content-disposition") ?? "";
-      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
-      const filename = filenameMatch?.[1] ?? `site-backup-${new Date().toISOString().replace(/[:.]/g, "").slice(0, 15)}.zip`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      setMessage(`Downloaded backup: ${filename} (${(blob.size / 1024).toFixed(0)} KB)`);
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        // Production mode: API returns a presigned S3 download URL
+        const result = await response.json() as { ok: boolean; filename: string; size: number; downloadUrl: string };
+        const a = document.createElement("a");
+        a.href = result.downloadUrl;
+        a.download = result.filename;
+        a.click();
+        setMessage(`Backup ready: ${result.filename} (${(result.size / 1024).toFixed(0)} KB)`);
+      } else {
+        // Local mode: API returns the ZIP inline
+        const blob = await response.blob();
+        const disposition = response.headers.get("content-disposition") ?? "";
+        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+        const filename = filenameMatch?.[1] ?? `site-backup-${new Date().toISOString().replace(/[:.]/g, "").slice(0, 15)}.zip`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        setMessage(`Downloaded backup: ${filename} (${(blob.size / 1024).toFixed(0)} KB)`);
+      }
     } catch (error) {
       setMessage(`Backup failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {

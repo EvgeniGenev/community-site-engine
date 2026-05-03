@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -28,6 +29,7 @@ import {
   ListUsersCommand
 } from "@aws-sdk/client-cognito-identity-provider";
 import { CodeBuildClient, StartBuildCommand, type EnvironmentVariable } from "@aws-sdk/client-codebuild";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
@@ -1154,8 +1156,21 @@ app.get("/api/backup", async (c) => {
   }
   const zip = await createSiteBackup();
   const timestamp = new Date().toISOString().replace(/[:.]/g, "").slice(0, 15);
+  const filename = `site-backup-${timestamp}.zip`;
+
+  // In S3 mode, upload to bucket and return a presigned download URL
+  // to bypass Lambda's 6 MB response payload limit.
+  if (config.storageMode === "s3" && config.s3Bucket) {
+    const backupKey = `backups/${filename}`;
+    await storage.putBytes(backupKey, new Uint8Array(zip), "application/zip");
+    const s3 = new S3Client({});
+    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: config.s3Bucket, Key: backupKey }), { expiresIn: 600 });
+    return c.json({ ok: true, filename, size: zip.length, downloadUrl: url });
+  }
+
+  // Local mode: return the ZIP inline
   c.header("Content-Type", "application/zip");
-  c.header("Content-Disposition", `attachment; filename="site-backup-${timestamp}.zip"`);
+  c.header("Content-Disposition", `attachment; filename="${filename}"`);
   c.header("Content-Length", String(zip.length));
   return c.body(zip as unknown as ArrayBuffer);
 });
