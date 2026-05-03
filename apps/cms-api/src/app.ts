@@ -903,12 +903,22 @@ async function writeLocalizedObject(collection: "pages" | "articles", key: strin
   const data = collection === "pages" ? PageSchema.parse(body) : ArticleSchema.parse(body);
   const languages = await supportedLanguageCodes();
   const created = [];
+  
+  const allItems = collection === "pages" ? await listCollection(storage, "pages") : [];
 
   await storage.put(key, `${JSON.stringify(data, null, 2)}\n`);
 
   for (const locale of languages) {
     if (locale === data.locale) continue;
-    const siblingKey = `${collection}/${locale}/${data.slug}.json`;
+    
+    let siblingKey = `${collection}/${locale}/${data.slug}.json`;
+    if (collection === "pages") {
+      const sibling = allItems.find(item => item.data.locale === locale && item.data.translationKey === (data as Page).translationKey);
+      if (sibling) {
+        siblingKey = sibling.key;
+      }
+    }
+    
     const existingRaw = await readJson(storage, siblingKey);
     let localized;
 

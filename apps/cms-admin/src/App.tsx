@@ -5,7 +5,7 @@ import "./styles/app.css";
 
 type Role = "admin" | "designer" | "contributor";
 type Collection = "pages" | "articles" | "events" | "navigation" | "settings" | "gallery";
-type Tab = "pages" | "menu" | "events" | "articles" | "gallery" | "css" | "settings" | "users" | "json";
+type Tab = "pages" | "menu" | "events" | "articles" | "gallery" | "css" | "settings" | "users" | "json" | "translations";
 type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta";
 type MediaFolder = "gallery" | "events" | "articles" | "settings";
 
@@ -716,6 +716,122 @@ function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; upda
   );
 }
 
+function TranslationsEditor(props: { token: string; onUpdate: () => void }) {
+  const [allPages, setAllPages] = useState<CmsObject<Page>[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAllPages = async () => {
+    setLoading(true);
+    try {
+      const data = await request<CmsObject<Page>[]>(props.token, "/api/list/pages");
+      setAllPages(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchAllPages();
+  }, [props.token]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, CmsObject<Page>[]>();
+    for (const page of allPages) {
+      const key = page.data.translationKey || "unlinked";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(page);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [allPages]);
+
+  const existingKeys = useMemo(() => Array.from(new Set(allPages.map(p => p.data.translationKey).filter(Boolean))), [allPages]);
+
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [newKeyVal, setNewKeyVal] = useState("");
+
+  const handleUpdate = async (page: CmsObject<Page>, newKey: string) => {
+    if (!newKey || newKey === page.data.translationKey) return;
+    try {
+      await request(props.token, `/api/object/${page.key}`, {
+        method: "PUT",
+        body: JSON.stringify({ ...page.data, translationKey: newKey })
+      });
+      await fetchAllPages();
+      props.onUpdate();
+    } catch (e) {
+      alert("Failed to update: " + String(e));
+    }
+  };
+
+  if (loading) return <div className="editor builder wideEditor" style={{ padding: "2rem" }}><p>Loading pages...</p></div>;
+
+  return (
+    <div className="editor builder wideEditor" style={{ padding: "2rem", overflowY: "auto" }}>
+      <header className="editorHeader">
+        <h2>Manage Page Translations</h2>
+      </header>
+      <div className="builderCard">
+        <p className="muted">Pages with the same Translation Key are linked together. When you modify the layout of a page, it automatically synchronizes to all other pages with the same key.</p>
+        
+        {groups.map(([translationKey, groupPages]) => (
+          <div key={translationKey} style={{ border: "1px solid #ddd", borderRadius: "8px", padding: "1rem", marginBottom: "1.5rem" }}>
+            <h3 style={{ marginTop: 0, fontSize: "1.1rem" }}>Key: <code>{translationKey}</code></h3>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Locale</th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Title</th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Slug</th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Translation Key</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupPages.map(page => (
+                  <tr key={page.key}>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}><strong>{page.data.locale.toUpperCase()}</strong></td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>{page.data.title}</td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>{page.data.slug}</td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
+                      {editingKey === page.key ? (
+                        <input 
+                          autoFocus
+                          value={newKeyVal} 
+                          onChange={e => setNewKeyVal(e.target.value)} 
+                          onBlur={() => { void handleUpdate(page, newKeyVal); setEditingKey(null); }}
+                          onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") setEditingKey(null); }}
+                          placeholder="New key..."
+                        />
+                      ) : (
+                        <select 
+                          value={page.data.translationKey || ""} 
+                          onChange={e => {
+                            if (e.target.value === "__NEW__") {
+                              setNewKeyVal("");
+                              setEditingKey(page.key);
+                            } else {
+                              void handleUpdate(page, e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="" disabled>Select key...</option>
+                          {existingKeys.map(k => <option key={k} value={k}>{k}</option>)}
+                          <option value="__NEW__">+ Create new key...</option>
+                        </select>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("community-site-engine-token") ?? (import.meta.env.DEV ? "dev-admin-token" : ""));
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -1399,7 +1515,7 @@ function App() {
   }, [tab, pages, events, articles, cssFiles]);
 
   const visibleTabs: Tab[] = user?.role === "admin"
-    ? ["events", "articles", "gallery", "pages", "menu", "settings", "users", "css", "json"]
+    ? ["events", "articles", "gallery", "pages", "menu", "settings", "users", "css", "json", "translations"]
     : user?.role === "designer"
       ? ["events", "articles", "gallery", "pages", "menu", "css"]
       : ["events", "articles", "gallery", "pages"];
@@ -1549,7 +1665,7 @@ function App() {
         </nav>
       </aside>
 
-      {tab !== "menu" && tab !== "gallery" && tab !== "json" && tab !== "settings" && tab !== "users" && (
+      {tab !== "menu" && tab !== "gallery" && tab !== "json" && tab !== "settings" && tab !== "users" && tab !== "translations" && (
         <section className="items">
           <header className="listHeader">
             <h2>{tab}</h2>
@@ -1572,7 +1688,12 @@ function App() {
         </section>
       )}
 
-      <section className={tab === "menu" || tab === "gallery" || tab === "settings" || tab === "users" || tab === "json" ? "editor builder wideEditor" : "editor builder"}>
+      {tab === "translations" && user?.role === "admin" && (
+        <TranslationsEditor token={token} onUpdate={() => refresh(token)} />
+      )}
+
+      {tab !== "translations" && (
+        <section className={tab === "menu" || tab === "gallery" || tab === "settings" || tab === "users" || tab === "json" ? "editor builder wideEditor" : "editor builder"}>
         {tab === "pages" && page && (
           <>
             <header className="editorHeader">
@@ -2204,6 +2325,7 @@ function App() {
           </div>
         )}
       </section>
+      )}
     </main>
   );
 }
