@@ -192,7 +192,9 @@ const eventScripts: string[] = [];
   }
 
   if (block.type === "eventList") {
-    const selectedEvents = block.eventIds.length ? events.filter((event) => block.eventIds.includes(event.id)) : events;
+    const selectedEvents = (block.eventIds.length ? events.filter((event) => block.eventIds.includes(event.id)) : events)
+      .slice()
+      .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
     const calendarEvents = selectedEvents.map((event) => ({ ...event, dateKey: eventDateKey(event.startsAt) }));
     const eventsId = `events-${eventScripts.length}`;
     eventScripts.push(eventsId);
@@ -202,7 +204,7 @@ const eventScripts: string[] = [];
         {block.intro && <p class="section-intro">{block.intro}</p>}
         {block.showCalendar !== false ? (
           <div class="events-workspace">
-            <aside class="calendar-panel">
+            <aside class="calendar-panel" style="min-width:0;overflow:hidden;">
               <div class="calendar-toolbar">
                 <button type="button" data-calendar-prev>Prev</button>
                 <strong data-calendar-title></strong>
@@ -211,7 +213,7 @@ const eventScripts: string[] = [];
               </div>
               <div class="calendar-grid" data-calendar-grid aria-label="Events calendar"></div>
             </aside>
-            <div class="event-list" data-event-list>
+            <div class="event-list" data-event-list style="min-width:0;">
             {selectedEvents.map((event) => (
               <article class="event-card" data-event-card data-date={eventDateKey(event.startsAt)}>
                 <div class="date-box">
