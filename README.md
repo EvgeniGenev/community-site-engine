@@ -93,7 +93,15 @@ After that, edit `site-assets/content` locally or through Admin and sync that pr
 
 ## Deployment Docs
 
-- `docs/IMPLEMENTATION.md`: architecture and security overview.
-- `docs/AWS_DEPLOYMENT.md`: single-template CloudFormation deployment and operations runbook.
-- `docs/MCP.md`: MCP setup and available tools.
+- `docs/ARCHITECTURE.md`: full architecture, data flows, storage, auth, content model, and AWS infrastructure.
+- `docs/LOCAL_DEV.md`: first-time setup, dev environment, env variables, troubleshooting.
+- `docs/CONTENT_GUIDE.md`: how to create and edit pages, events, articles, gallery, navigation, and CSS.
+- `docs/API_REFERENCE.md`: complete CMS API endpoint reference.
+- `docs/MCP.md`: MCP server setup and available tools.
+- `docs/AWS_DEPLOYMENT.md`: CloudFormation deployment and operations runbook.
+- `docs/IMPLEMENTATION.md`: architecture summary and security notes.
 - `docs/COST.md`: low-traffic AWS cost notes.
+
+## Private Content Note
+
+`site-assets-private-backup-*/` directories contain live site content for the deployed instance and are **never pushed to GitHub** (gitignored). Copy to `site-assets/content/` before running locally.

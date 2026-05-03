@@ -313,5 +313,29 @@ server.registerTool(
   async () => jsonText(await cms.triggerBuild())
 );
 
+server.registerTool(
+  "cms_backup",
+  {
+    title: "Download site backup",
+    description: "Download a full site backup as a ZIP archive. The ZIP is saved to the local tmp/ directory. Returns the file path and size. Requires admin token.",
+    inputSchema: {
+      outputDir: z.string().min(1).optional()
+    }
+  },
+  async ({ outputDir }) => jsonText(await cms.backup(outputDir))
+);
+
+server.registerTool(
+  "cms_restore",
+  {
+    title: "Restore site from backup",
+    description: "Restore all site content from a previously downloaded backup ZIP file. This overwrites all current content. A pre-restore snapshot is created automatically. Requires admin token.",
+    inputSchema: {
+      zipPath: z.string().min(1)
+    }
+  },
+  async ({ zipPath }) => jsonText(await cms.restore(zipPath))
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

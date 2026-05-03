@@ -1,5 +1,7 @@
 import { ArticleSchema, EventSchema, GallerySchema, NavigationSchema, PageSchema, SiteSettingsSchema } from "@community-site-engine/shared";
 import { z } from "zod";
+import { writeFile, readFile, mkdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 const CollectionSchema = z.enum(["pages", "articles", "events", "navigation", "settings", "gallery"]);
 export type Collection = z.infer<typeof CollectionSchema>;
@@ -168,6 +170,43 @@ export class CmsClient {
       method: "POST",
       body: JSON.stringify(input)
     });
+  }
+
+  async backup(outputDir?: string): Promise<{ path: string; size: number }> {
+    const response = await fetch(`${this.baseUrl}/api/backup`, {
+      headers: { Authorization: `Bearer ${this.token}` }
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`CMS API ${response.status}: ${body}`);
+    }
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+    const filename = filenameMatch?.[1] ?? `site-backup-${new Date().toISOString().replace(/[:.]/g, "").slice(0, 15)}.zip`;
+    const dir = outputDir ?? resolve(process.cwd(), "../../tmp");
+    await mkdir(dir, { recursive: true });
+    const path = resolve(dir, filename);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    await writeFile(path, bytes);
+    return { path, size: bytes.length };
+  }
+
+  async restore(zipPath: string): Promise<unknown> {
+    const bytes = await readFile(zipPath);
+    const response = await fetch(`${this.baseUrl}/api/restore`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        "Content-Type": "application/zip"
+      },
+      body: bytes
+    });
+    const body = await response.text();
+    const parsed = body ? JSON.parse(body) : null;
+    if (!response.ok) {
+      throw new Error(`CMS API ${response.status}: ${JSON.stringify(parsed)}`);
+    }
+    return parsed;
   }
 }
 

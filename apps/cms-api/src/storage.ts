@@ -12,7 +12,9 @@ export interface StoredObject {
 
 export interface StorageDriver {
   list(prefix: string): Promise<string[]>;
+  listAll(): Promise<string[]>;
   get(key: string): Promise<string | null>;
+  getBytes(key: string): Promise<Uint8Array | null>;
   put(key: string, body: string, contentType?: string): Promise<void>;
   putBytes(key: string, body: Uint8Array, contentType: string): Promise<void>;
   delete(key: string): Promise<void>;
@@ -66,9 +68,21 @@ export class LocalStorageDriver implements StorageDriver {
       .sort();
   }
 
+  async listAll(): Promise<string[]> {
+    return this.list("");
+  }
+
   async get(key: string): Promise<string | null> {
     try {
       return await readFile(this.pathFor(key), "utf8");
+    } catch {
+      return null;
+    }
+  }
+
+  async getBytes(key: string): Promise<Uint8Array | null> {
+    try {
+      return await readFile(this.pathFor(key));
     } catch {
       return null;
     }
@@ -103,6 +117,20 @@ async function streamToString(stream: unknown): Promise<string> {
     return (stream as { transformToString: () => Promise<string> }).transformToString();
   }
   return "";
+}
+
+async function streamToBytes(stream: unknown): Promise<Uint8Array> {
+  if (stream instanceof Readable) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+  if (stream && typeof (stream as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray === "function") {
+    return (stream as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+  }
+  return new Uint8Array();
 }
 
 export class S3StorageDriver implements StorageDriver {
@@ -145,10 +173,23 @@ export class S3StorageDriver implements StorageDriver {
     return keys.sort();
   }
 
+  async listAll(): Promise<string[]> {
+    return this.list("");
+  }
+
   async get(key: string): Promise<string | null> {
     try {
       const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.keyFor(key) }));
       return streamToString(result.Body);
+    } catch {
+      return null;
+    }
+  }
+
+  async getBytes(key: string): Promise<Uint8Array | null> {
+    try {
+      const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.keyFor(key) }));
+      return streamToBytes(result.Body);
     } catch {
       return null;
     }

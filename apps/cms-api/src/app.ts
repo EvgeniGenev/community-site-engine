@@ -31,6 +31,7 @@ import { CodeBuildClient, StartBuildCommand, type EnvironmentVariable } from "@a
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { can, authenticate, type AuthUser } from "./auth.js";
 import { config } from "./config.js";
 import { CollectionSchema, listCollection, publishDraft, readJson, schemaFor, writeValidated } from "./content.js";
@@ -367,6 +368,185 @@ async function listCssFiles() {
     name: key.replace(/^styles\//, ""),
     css: await storage.get(key) ?? ""
   })));
+}
+
+/* ---- Minimal ZIP helpers (Node.js built-in zlib, no extra deps) ---- */
+
+function crc32(buf: Uint8Array) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i]!;
+    for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function le16(n: number) { const b = Buffer.alloc(2); b.writeUInt16LE(n); return b; }
+function le32(n: number) { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b; }
+
+interface ZipEntry { name: string; data: Uint8Array; }
+
+function createZipArchive(entries: ZipEntry[]): Buffer {
+  const localHeaders: Buffer[] = [];
+  const centralHeaders: Buffer[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBytes = Buffer.from(entry.name, "utf8");
+    const compressed = deflateRawSync(entry.data);
+    const crc = crc32(entry.data);
+    const useDeflate = compressed.length < entry.data.length;
+    const stored = useDeflate ? compressed : Buffer.from(entry.data);
+    const method = useDeflate ? 8 : 0;
+
+    const local = Buffer.concat([
+      Buffer.from([0x50, 0x4b, 0x03, 0x04]), // local header sig
+      le16(20), le16(0x0800), le16(method),
+      le16(0), le16(0), // mod time/date
+      le32(crc), le32(stored.length), le32(entry.data.length),
+      le16(nameBytes.length), le16(0),
+      nameBytes, stored
+    ]);
+    localHeaders.push(local);
+
+    const central = Buffer.concat([
+      Buffer.from([0x50, 0x4b, 0x01, 0x02]),
+      le16(20), le16(20), le16(0x0800), le16(method),
+      le16(0), le16(0),
+      le32(crc), le32(stored.length), le32(entry.data.length),
+      le16(nameBytes.length), le16(0), le16(0), le16(0), le16(0),
+      le32(0), le32(offset),
+      nameBytes
+    ]);
+    centralHeaders.push(central);
+    offset += local.length;
+  }
+
+  const centralDirSize = centralHeaders.reduce((s, b) => s + b.length, 0);
+  const eocd = Buffer.concat([
+    Buffer.from([0x50, 0x4b, 0x05, 0x06]),
+    le16(0), le16(0),
+    le16(entries.length), le16(entries.length),
+    le32(centralDirSize), le32(offset),
+    le16(0)
+  ]);
+
+  return Buffer.concat([...localHeaders, ...centralHeaders, eocd]);
+}
+
+function extractZipArchive(zipBuffer: Buffer): ZipEntry[] {
+  const entries: ZipEntry[] = [];
+  let pos = 0;
+  while (pos + 30 <= zipBuffer.length) {
+    if (zipBuffer[pos] !== 0x50 || zipBuffer[pos + 1] !== 0x4b || zipBuffer[pos + 2] !== 0x03 || zipBuffer[pos + 3] !== 0x04) break;
+    const method = zipBuffer.readUInt16LE(pos + 8);
+    const compressedSize = zipBuffer.readUInt32LE(pos + 18);
+    const uncompressedSize = zipBuffer.readUInt32LE(pos + 22);
+    const nameLen = zipBuffer.readUInt16LE(pos + 26);
+    const extraLen = zipBuffer.readUInt16LE(pos + 28);
+    const name = zipBuffer.subarray(pos + 30, pos + 30 + nameLen).toString("utf8");
+    const dataStart = pos + 30 + nameLen + extraLen;
+    const rawData = zipBuffer.subarray(dataStart, dataStart + compressedSize);
+    let data: Uint8Array;
+    if (method === 8) {
+      data = inflateRawSync(rawData);
+    } else {
+      data = new Uint8Array(rawData);
+    }
+    if (name && !name.endsWith("/")) {
+      entries.push({ name, data });
+    }
+    pos = dataStart + compressedSize;
+  }
+  return entries;
+}
+
+const BACKUP_PREFIXES = ["pages", "articles", "events", "gallery", "navigation", "settings", "styles", "media"];
+const MAX_RESTORE_BYTES = 100 * 1024 * 1024; // 100 MB
+
+async function createSiteBackup(): Promise<Buffer> {
+  const allKeys = await storage.listAll();
+  const contentKeys = allKeys.filter((key) =>
+    BACKUP_PREFIXES.some((prefix) => key.startsWith(`${prefix}/`) || key === prefix) &&
+    !key.startsWith("drafts/") &&
+    !key.startsWith("snapshots/")
+  );
+
+  const entries: ZipEntry[] = [];
+  for (const key of contentKeys) {
+    if (key.startsWith("media/")) {
+      const bytes = await storage.getBytes(key);
+      if (bytes) entries.push({ name: key, data: bytes });
+    } else {
+      const text = await storage.get(key);
+      if (text !== null) entries.push({ name: key, data: new TextEncoder().encode(text) });
+    }
+  }
+
+  return createZipArchive(entries);
+}
+
+async function restoreSiteBackup(zipBuffer: Buffer) {
+  if (zipBuffer.length > MAX_RESTORE_BYTES) {
+    throw new HTTPException(413, { message: `Backup archive too large. Maximum ${MAX_RESTORE_BYTES} bytes.` });
+  }
+
+  const entries = extractZipArchive(zipBuffer);
+  if (entries.length === 0) {
+    throw new HTTPException(400, { message: "The uploaded archive contains no files." });
+  }
+
+  // Validate: every entry key must be under one of the allowed prefixes
+  for (const entry of entries) {
+    if (entry.name.includes("..") || entry.name.startsWith("/") || entry.name.startsWith("\\")) {
+      throw new HTTPException(400, { message: `Unsafe path in archive: ${entry.name}` });
+    }
+    if (!BACKUP_PREFIXES.some((prefix) => entry.name.startsWith(`${prefix}/`))) {
+      throw new HTTPException(400, { message: `Unexpected path in archive: ${entry.name}. Allowed top-level directories: ${BACKUP_PREFIXES.join(", ")}` });
+    }
+  }
+
+  // Create a pre-restore snapshot of current content
+  const snapshotPrefix = `snapshots/pre-restore-${new Date().toISOString().replaceAll(":", "")}`;
+  const currentKeys = await storage.listAll();
+  const currentContentKeys = currentKeys.filter((key) =>
+    BACKUP_PREFIXES.some((prefix) => key.startsWith(`${prefix}/`)) &&
+    !key.startsWith("drafts/") &&
+    !key.startsWith("snapshots/")
+  );
+  for (const key of currentContentKeys) {
+    if (key.startsWith("media/")) {
+      const bytes = await storage.getBytes(key);
+      if (bytes) await storage.putBytes(`${snapshotPrefix}/${key}`, bytes, "application/octet-stream");
+    } else {
+      const text = await storage.get(key);
+      if (text !== null) await storage.put(`${snapshotPrefix}/${key}`, text);
+    }
+  }
+
+  // Restore from archive
+  let restored = 0;
+  for (const entry of entries) {
+    if (entry.name.startsWith("media/")) {
+      const ext = entry.name.split(".").pop()?.toLowerCase() ?? "";
+      const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" };
+      const contentType = mimeMap[ext] ?? "application/octet-stream";
+      await storage.putBytes(entry.name, entry.data, contentType);
+      // Also copy to Astro public directory in local mode
+      if (config.storageMode === "local") {
+        const publicPath = resolve(process.cwd(), "../../apps/site/public", entry.name);
+        await mkdir(dirname(publicPath), { recursive: true });
+        await writeFile(publicPath, entry.data);
+      }
+    } else {
+      const text = new TextDecoder().decode(entry.data);
+      const contentType = entry.name.endsWith(".css") ? "text/css" : "application/json";
+      await storage.put(entry.name, text, contentType);
+    }
+    restored += 1;
+  }
+
+  return { restored, snapshotPrefix, entries: entries.map((e) => e.name) };
 }
 
 function decodeHtml(value: string) {
@@ -965,4 +1145,47 @@ app.post("/api/build-webhook", async (c) => {
   }
   const result = await triggerSiteBuild(user);
   return c.json(result, result.ok ? 200 : 202);
+});
+
+app.get("/api/backup", async (c) => {
+  const user = c.get("user");
+  if (!can(user.role, "settings")) {
+    throw new HTTPException(403, { message: "Only admins can create site backups" });
+  }
+  const zip = await createSiteBackup();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "").slice(0, 15);
+  return new Response(new Uint8Array(zip), {
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="site-backup-${timestamp}.zip"`,
+      "Content-Length": String(zip.length)
+    }
+  });
+});
+
+app.post("/api/restore", async (c) => {
+  const user = c.get("user");
+  if (!can(user.role, "settings")) {
+    throw new HTTPException(403, { message: "Only admins can restore site backups" });
+  }
+  const contentType = c.req.header("content-type") ?? "";
+  let zipBuffer: Buffer;
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await c.req.parseBody();
+    const file = formData.file;
+    if (!file || typeof file === "string" || Array.isArray(file)) {
+      throw new HTTPException(400, { message: "No file uploaded. Send a ZIP file as multipart form-data with field name 'file'." });
+    }
+    zipBuffer = Buffer.from(await (file as File).arrayBuffer());
+  } else {
+    zipBuffer = Buffer.from(await c.req.arrayBuffer());
+  }
+  if (zipBuffer.length < 22) {
+    throw new HTTPException(400, { message: "Uploaded file is too small to be a valid ZIP archive." });
+  }
+  if (zipBuffer[0] !== 0x50 || zipBuffer[1] !== 0x4b) {
+    throw new HTTPException(400, { message: "Uploaded file does not appear to be a ZIP archive." });
+  }
+  const result = await restoreSiteBackup(zipBuffer);
+  return c.json({ ok: true, ...result });
 });

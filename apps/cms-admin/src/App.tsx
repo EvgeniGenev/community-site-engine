@@ -758,6 +758,8 @@ function App() {
     password: "",
     permanent: false
   });
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [restoreBusy, setRestoreBusy] = useState(false);
 
   const role = user?.role;
   const structureAllowed = canStructure(role);
@@ -1142,6 +1144,62 @@ function App() {
     const buildMessage = await triggerSiteBuildMessage();
     setMessage(`Saved settings.${buildMessage}`);
     await refresh();
+  }
+
+  async function downloadBackup() {
+    setBackupBusy(true);
+    try {
+      const response = await fetch(`${apiBase()}/api/backup`, { headers: authHeaders(token) });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ message: `HTTP ${response.status}` })) as { message?: string };
+        throw new Error(err.message ?? `HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+      const filename = filenameMatch?.[1] ?? `site-backup-${new Date().toISOString().replace(/[:.]/g, "").slice(0, 15)}.zip`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage(`Downloaded backup: ${filename} (${(blob.size / 1024).toFixed(0)} KB)`);
+    } catch (error) {
+      setMessage(`Backup failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  async function uploadRestore() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip";
+    const file = await new Promise<File | null>((resolve) => {
+      input.onchange = () => resolve(input.files?.[0] ?? null);
+      input.click();
+    });
+    if (!file) return;
+    if (!confirm(`Restore from "${file.name}"?\n\nThis will overwrite ALL current site content (pages, articles, events, gallery, settings, media, etc.) with the contents of this backup.\n\nA pre-restore snapshot will be saved automatically, but this operation cannot be easily undone.\n\nContinue?`)) return;
+    setRestoreBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`${apiBase()}/api/restore`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const result = await response.json() as { ok?: boolean; restored?: number; snapshotPrefix?: string; message?: string };
+      if (!response.ok) throw new Error(result.message ?? `HTTP ${response.status}`);
+      setMessage(`Restored ${result.restored ?? 0} files from backup. Pre-restore snapshot saved to ${result.snapshotPrefix ?? "snapshots/"}.`);
+      await refresh();
+    } catch (error) {
+      setMessage(`Restore failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setRestoreBusy(false);
+    }
   }
 
   async function saveMenu() {
@@ -1988,6 +2046,23 @@ function App() {
                     );
                   })}
                 </div>
+              </section>
+            </div>
+            <div className="builderCard">
+              <section className="backupRestore">
+                <div>
+                  <h3>Backup & Restore</h3>
+                  <p className="muted">Download a complete backup of all site content as a ZIP archive, or restore from a previously downloaded backup. Backups include pages, articles, events, gallery, navigation, settings, styles, and media.</p>
+                </div>
+                <div className="actionsRow">
+                  <button onClick={() => void downloadBackup()} disabled={backupBusy}>
+                    {backupBusy ? "Creating backup..." : "\u2B07 Download Backup"}
+                  </button>
+                  <button className="danger" onClick={() => void uploadRestore()} disabled={restoreBusy}>
+                    {restoreBusy ? "Restoring..." : "\u2B06 Restore from Backup"}
+                  </button>
+                </div>
+                <p className="muted"><strong>Warning:</strong> Restoring from a backup will replace all current site content with the backup contents. A pre-restore snapshot is created automatically before any changes are made.</p>
               </section>
             </div>
           </>
