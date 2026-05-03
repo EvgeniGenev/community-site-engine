@@ -413,11 +413,11 @@ function createZipArchive(entries: ZipEntry[]): Buffer {
 
     const central = Buffer.concat([
       Buffer.from([0x50, 0x4b, 0x01, 0x02]),
-      le16(20), le16(20), le16(0x0800), le16(method),
+      le16(0x0314), le16(20), le16(0x0800), le16(method),
       le16(0), le16(0),
       le32(crc), le32(stored.length), le32(entry.data.length),
       le16(nameBytes.length), le16(0), le16(0), le16(0), le16(0),
-      le32(0), le32(offset),
+      le32(0x81A40000), le32(offset),
       nameBytes
     ]);
     centralHeaders.push(central);
@@ -1164,7 +1164,12 @@ app.get("/api/backup", async (c) => {
     const backupKey = `backups/${filename}`;
     await storage.putBytes(backupKey, new Uint8Array(zip), "application/zip");
     const s3 = new S3Client({});
-    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: config.s3Bucket, Key: backupKey }), { expiresIn: 600 });
+    const command = new GetObjectCommand({
+      Bucket: config.s3Bucket,
+      Key: backupKey,
+      ResponseContentDisposition: `attachment; filename="${filename}"`
+    });
+    const url = await getSignedUrl(s3, command, { expiresIn: 600 });
     return c.json({ ok: true, filename, size: zip.length, downloadUrl: url });
   }
 
