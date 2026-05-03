@@ -1145,8 +1145,13 @@ app.post("/api/build-webhook", async (c) => {
   if (!can(user.role, "writeContent")) {
     throw new HTTPException(403, { message: "Insufficient permissions" });
   }
-  const result = await triggerSiteBuild(user);
-  return c.json(result, result.ok ? 200 : 202);
+  try {
+    const result = await triggerSiteBuild(user);
+    return c.json(result, result.ok ? 200 : 202);
+  } catch (err) {
+    const error = err as Error;
+    return c.json({ error: error.name, message: error.message, stack: error.stack }, 500);
+  }
 });
 
 app.get("/api/backup", async (c) => {
