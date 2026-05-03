@@ -913,7 +913,7 @@ async function writeLocalizedObject(collection: "pages" | "articles", key: strin
     
     let siblingKey = `${collection}/${locale}/${data.slug}.json`;
     if (collection === "pages") {
-      const sibling = allItems.find(item => item.data.locale === locale && item.data.translationKey === (data as Page).translationKey);
+      const sibling = allItems.find(item => (item.data as Page).locale === locale && (item.data as Page).translationKey === (data as Page).translationKey);
       if (sibling) {
         siblingKey = sibling.key;
       }
