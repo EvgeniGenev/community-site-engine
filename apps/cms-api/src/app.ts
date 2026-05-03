@@ -1154,13 +1154,10 @@ app.get("/api/backup", async (c) => {
   }
   const zip = await createSiteBackup();
   const timestamp = new Date().toISOString().replace(/[:.]/g, "").slice(0, 15);
-  return new Response(new Uint8Array(zip), {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="site-backup-${timestamp}.zip"`,
-      "Content-Length": String(zip.length)
-    }
-  });
+  c.header("Content-Type", "application/zip");
+  c.header("Content-Disposition", `attachment; filename="site-backup-${timestamp}.zip"`);
+  c.header("Content-Length", String(zip.length));
+  return c.body(zip as unknown as ArrayBuffer);
 });
 
 app.post("/api/restore", async (c) => {
