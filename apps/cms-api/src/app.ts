@@ -551,6 +551,318 @@ async function restoreSiteBackup(zipBuffer: Buffer) {
   return { restored, snapshotPrefix, entries: entries.map((e) => e.name) };
 }
 
+function stripTagsPreservingLineBreaks(value: string) {
+  // Convert block-level tags to newlines before stripping
+  const withBreaks = value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+  return decodeHtml(withBreaks)
+    .replace(/[ \t]+/g, " ")        // collapse inline whitespace only
+    .replace(/\n{3,}/g, "\n\n")     // max 2 consecutive blank lines
+    .replace(/^ +| +$/gm, "")       // trim each line
+    .trim();
+}
+
+/** Deep-search an arbitrary object for a named key, returning first string found. */
+function deepFind(obj: unknown, key: string, maxDepth = 8): string | number | undefined {
+  if (maxDepth <= 0 || !obj || typeof obj !== "object") return undefined;
+  const record = obj as Record<string, unknown>;
+  if (key in record) {
+    const v = record[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  for (const val of Object.values(record)) {
+    const found = deepFind(val, key, maxDepth - 1);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/** Extract all inline JS assignments like window.__DATA__ = {...} or __NEXT_DATA__ = {...} */
+function embeddedJsonBlobs(html: string): unknown[] {
+  const blobs: unknown[] = [];
+  // Pattern: some_var = { ... } or some_var = [ ... ] as a JS assignment in a script tag
+  const scriptPattern = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  for (const scriptMatch of html.matchAll(scriptPattern)) {
+    const script = scriptMatch[1] ?? "";
+    // Look for large JSON objects assigned to variables
+    const assignPattern = /(?:__(?:NEXT|RELAY|SSR|SERVER|INITIAL|BOOTSTRAP|DATA|PAGE)_DATA__|requireLazy|handleServerJS|bigPipe\.onPageletArrive|ScheduledApplyEach|__d\(|bootloadable)\s*[=(,]?\s*(\{[\s\S]{200,})/gi;
+    for (const assignMatch of script.matchAll(assignPattern)) {
+      const raw = assignMatch[1] ?? "";
+      // Try to find valid JSON by scanning for balanced braces
+      let depth = 0;
+      let end = 0;
+      for (let i = 0; i < raw.length; i++) {
+        if (raw[i] === "{") depth++;
+        else if (raw[i] === "}") {
+          depth--;
+          if (depth === 0) { end = i + 1; break; }
+        }
+      }
+      if (end > 10) {
+        try {
+          blobs.push(JSON.parse(raw.slice(0, end)));
+        } catch { /* ignore parse failures */ }
+      }
+    }
+    // Also try: window._stringTable_ or require("InitialJSLoader") patterns
+    const jsonPattern = /(\{(?:[^{}]|\{[^{}]*\}){500,}\})/g;
+    for (const jsonMatch of script.matchAll(jsonPattern)) {
+      try {
+        blobs.push(JSON.parse(jsonMatch[1]!));
+      } catch { /* ignore */ }
+    }
+  }
+  return blobs;
+}
+
+interface FbEventData {
+  title?: string;
+  description?: string;
+  startTime?: number;  // Unix epoch seconds
+  endTime?: number;    // Unix epoch seconds
+  locationName?: string;
+  locationCity?: string;
+  locationStreet?: string;
+  locationState?: string;
+  locationCountry?: string;
+  imageSrc?: string;
+  coverImageSrc?: string;
+}
+
+/**
+ * Walk an arbitrary object looking for Facebook event data patterns.
+ * Facebook embeds event data as deeply nested objects with fields like
+ * start_time, end_time, event_description, name, cover_media_renderer, etc.
+ */
+function extractFbEventData(obj: unknown, depth = 0): FbEventData {
+  const result: FbEventData = {};
+  if (depth > 12 || !obj || typeof obj !== "object") return result;
+
+  const walk = (o: unknown, d: number): void => {
+    if (d > 12 || !o || typeof o !== "object") return;
+    const r = o as Record<string, unknown>;
+
+    // Check if this looks like an event node
+    const hasEventFields = ("start_time" in r || "startTime" in r) &&
+      ("name" in r || "title" in r || "event_description" in r);
+
+    if (hasEventFields) {
+      const start = r["start_time"] ?? r["startTime"];
+      const end = r["end_time"] ?? r["endTime"];
+      const name = r["name"] ?? r["title"];
+      const desc = r["description"] ?? r["event_description"] ?? r["text"];
+      const cover = r["cover_media_renderer"] ?? r["cover"] ?? r["cover_media"];
+      const place = r["event_place"] ?? r["place"] ?? r["location"];
+
+      if (typeof start === "number" && !result.startTime) result.startTime = start;
+      if (typeof end === "number" && !result.endTime) result.endTime = end;
+      if (typeof name === "string" && name.trim() && !result.title) result.title = name.trim();
+      if (typeof desc === "string" && desc.trim() && !result.description) {
+        result.description = desc.trim();
+      } else if (desc && typeof desc === "object") {
+        // desc might be { text: "..." }
+        const textVal = (desc as Record<string, unknown>)["text"];
+        if (typeof textVal === "string" && textVal.trim() && !result.description) {
+          result.description = textVal.trim();
+        }
+      }
+
+      if (cover && typeof cover === "object") {
+        const coverRecord = cover as Record<string, unknown>;
+        const img = coverRecord["photo"] ?? coverRecord["image"] ?? coverRecord["media"];
+        if (img && typeof img === "object") {
+          const imgRecord = img as Record<string, unknown>;
+          const src = (imgRecord["image"] as Record<string, unknown>)?.["uri"]
+            ?? (imgRecord["large_render_image"] as Record<string, unknown>)?.["uri"]
+            ?? imgRecord["uri"]
+            ?? imgRecord["src"];
+          if (typeof src === "string" && src.startsWith("http") && !result.coverImageSrc) {
+            result.coverImageSrc = src;
+          }
+        }
+      }
+
+      if (place && typeof place === "object") {
+        const placeRecord = place as Record<string, unknown>;
+        if (typeof placeRecord["name"] === "string" && !result.locationName) {
+          result.locationName = placeRecord["name"];
+        }
+        const loc = placeRecord["location"];
+        if (loc && typeof loc === "object") {
+          const locRecord = loc as Record<string, unknown>;
+          if (typeof locRecord["city"] === "string") result.locationCity = locRecord["city"];
+          if (typeof locRecord["street"] === "string") result.locationStreet = locRecord["street"];
+          if (typeof locRecord["state"] === "string") result.locationState = locRecord["state"];
+          if (typeof locRecord["country"] === "string") result.locationCountry = locRecord["country"];
+        }
+      }
+    }
+
+    for (const val of Object.values(r)) {
+      if (Array.isArray(val)) {
+        for (const item of val) walk(item, d + 1);
+      } else {
+        walk(val, d + 1);
+      }
+    }
+  };
+
+  walk(obj, depth);
+  return result;
+}
+
+async function importFacebookEvent(url: string, timeZone: string): Promise<Event> {
+  const initialUrl = new URL(url);
+  const allowedHosts = new Set(["facebook.com", "www.facebook.com", "m.facebook.com", "fb.me"]);
+  if (!allowedHosts.has(initialUrl.hostname.toLowerCase())) {
+    throw new HTTPException(400, { message: "Only public Facebook event/share links are supported." });
+  }
+
+  let currentUrl = initialUrl;
+  let response: Response | null = null;
+  for (let redirectCount = 0; redirectCount < 5; redirectCount += 1) {
+    response = await fetch(currentUrl.toString(), {
+      redirect: "manual",
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+        // Use a realistic browser UA — Facebook blocks simple bot UAs
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    if (!location) break;
+    currentUrl = new URL(location, currentUrl);
+    if (!allowedHosts.has(currentUrl.hostname.toLowerCase())) {
+      throw new HTTPException(400, { message: "Facebook import redirected to an unsupported host." });
+    }
+  }
+  if (!response?.ok) {
+    throw new HTTPException(400, { message: `Facebook returned ${response?.status ?? "no response"}. Make sure this is a public event link.` });
+  }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType && !contentType.toLowerCase().includes("text/html")) {
+    throw new HTTPException(400, { message: "Facebook import expected an HTML page." });
+  }
+  const html = (await response.text()).slice(0, 5_000_000);
+
+  // === Layer 1: Embedded JS blobs (most reliable for FB events) ===
+  const blobs = embeddedJsonBlobs(html);
+  let fbData: FbEventData = {};
+  for (const blob of blobs) {
+    const extracted = extractFbEventData(blob);
+    // Merge: prefer whichever has more data
+    if (extracted.startTime && !fbData.startTime) fbData.startTime = extracted.startTime;
+    if (extracted.endTime && !fbData.endTime) fbData.endTime = extracted.endTime;
+    if (extracted.title && !fbData.title) fbData.title = extracted.title;
+    if (extracted.description && !fbData.description) fbData.description = extracted.description;
+    if (extracted.locationName && !fbData.locationName) fbData.locationName = extracted.locationName;
+    if (extracted.locationCity && !fbData.locationCity) fbData.locationCity = extracted.locationCity;
+    if (extracted.locationStreet && !fbData.locationStreet) fbData.locationStreet = extracted.locationStreet;
+    if (extracted.locationState && !fbData.locationState) fbData.locationState = extracted.locationState;
+    if (extracted.coverImageSrc && !fbData.coverImageSrc) fbData.coverImageSrc = extracted.coverImageSrc;
+  }
+
+  // === Layer 2: JSON-LD ===
+  const jsonLdEvent = jsonLdObjects(html).map(findJsonLdEvent).find(Boolean);
+
+  // === Layer 3: OpenGraph meta ===
+  const metaDescription = metaContent(html, "og:description") ?? metaContent(html, "description") ?? "";
+  const startFromMeta = metaContent(html, "event:start_time") ?? metaContent(html, "startDate");
+  const endFromMeta = metaContent(html, "event:end_time") ?? metaContent(html, "endDate");
+
+  // === Layer 4: Human-readable date in plain text (last resort for start time) ===
+  const plainText = stripTagsPreservingLineBreaks(html);
+  const humanStart = parseHumanDate(`${metaDescription} ${plainText.slice(0, 2000)}`, timeZone);
+
+  // === Merge: pick best value from each layer ===
+  const title = fbData.title
+    ?? firstString(jsonLdEvent?.name)
+    ?? titleFromHtml(html)
+    ?? "Imported Facebook Event";
+
+  // Description: prefer embedded JS (has full text + line breaks), then JSON-LD, then og:description
+  let description = fbData.description
+    ?? firstString(jsonLdEvent?.description)
+    ?? metaDescription;
+
+  // If description still looks like a truncated og:description (ends with "..."), try plainText extraction
+  if (!description || description.endsWith("…") || description.endsWith("...")) {
+    // og:description is often truncated; try to get more from visible text
+    // Look for the description block near the event title in plainText
+    const titleIdx = plainText.indexOf(title);
+    if (titleIdx >= 0) {
+      const afterTitle = plainText.slice(titleIdx + title.length, titleIdx + title.length + 3000).trim();
+      // Skip the date line (first 2 lines typically) and take the rest
+      const lines = afterTitle.split("\n").filter((l) => l.trim().length > 0);
+      const descLines = lines.slice(2); // Skip title repetition and date line
+      if (descLines.length > 0 && descLines.join(" ").length > (description?.length ?? 0)) {
+        description = descLines.join("\n").trim();
+      }
+    }
+  }
+
+  // Image
+  const imageSrc = fbData.coverImageSrc
+    ?? firstString(jsonLdEvent?.image)
+    ?? metaContent(html, "og:image");
+
+  // Location
+  const jsonLdLocation = jsonLdEvent?.location && typeof jsonLdEvent.location === "object"
+    ? jsonLdEvent.location as Record<string, unknown>
+    : undefined;
+  const jsonLdAddress = jsonLdLocation?.address && typeof jsonLdLocation.address === "object"
+    ? jsonLdLocation.address as Record<string, unknown>
+    : undefined;
+
+  const locationName = fbData.locationName ?? firstString(jsonLdLocation?.name);
+  const addressParts = [
+    fbData.locationStreet ?? firstString(jsonLdAddress?.streetAddress),
+    fbData.locationCity ?? firstString(jsonLdAddress?.addressLocality),
+    fbData.locationState ?? firstString(jsonLdAddress?.addressRegion),
+    firstString(jsonLdAddress?.postalCode),
+    fbData.locationCountry ?? firstString(jsonLdAddress?.addressCountry)
+  ].filter(Boolean);
+  const locationText = addressParts.length ? addressParts.join(", ") : undefined;
+
+  // Times: embedded epoch > JSON-LD ISO > og meta > human-text regex
+  const startsAt = toConfiguredTimeZoneIso(fbData.startTime ?? firstString(jsonLdEvent?.startDate) ?? startFromMeta, timeZone)
+    ?? humanStart?.iso;
+  const endsAt = toConfiguredTimeZoneIso(fbData.endTime ?? firstString(jsonLdEvent?.endDate) ?? endFromMeta, timeZone);
+
+  if (!startsAt) {
+    throw new HTTPException(422, { message: "Could not extract an event start date/time from the public Facebook page. The page may require login or hide event metadata." });
+  }
+
+  const notes: string[] = [`Imported from Facebook: ${initialUrl.toString()}`];
+  if (humanStart && !humanStart.hasTime && !fbData.startTime) {
+    notes.push("Facebook public metadata did not expose a start time; verify the event time before publishing.");
+  }
+
+  const slug = slugifyImport(title);
+  return EventSchema.parse({
+    id: slug,
+    status: "draft",
+    title,
+    slug,
+    startsAt,
+    endsAt,
+    locationName,
+    address: locationText,
+    image: imageSrc ? { src: imageSrc, alt: title } : undefined,
+    description: description || `Imported from Facebook: ${initialUrl.toString()}`,
+    notes: notes.join("\n")
+  });
+}
 function decodeHtml(value: string) {
   const named: Record<string, string> = {
     amp: "&",
@@ -717,82 +1029,7 @@ function firstString(value: unknown): string | undefined {
   return undefined;
 }
 
-async function importFacebookEvent(url: string, timeZone: string): Promise<Event> {
-  const initialUrl = new URL(url);
-  const allowedHosts = new Set(["facebook.com", "www.facebook.com", "m.facebook.com", "fb.me"]);
-  if (!allowedHosts.has(initialUrl.hostname.toLowerCase())) {
-    throw new HTTPException(400, { message: "Only public Facebook event/share links are supported." });
-  }
 
-  let currentUrl = initialUrl;
-  let response: Response | null = null;
-  for (let redirectCount = 0; redirectCount < 5; redirectCount += 1) {
-    response = await fetch(currentUrl.toString(), {
-      redirect: "manual",
-      signal: AbortSignal.timeout(12000),
-      headers: {
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-        "User-Agent": "Mozilla/5.0 (compatible; CommunitySiteEngine/0.1)"
-      }
-    });
-    if (![301, 302, 303, 307, 308].includes(response.status)) break;
-    const location = response.headers.get("location");
-    if (!location) break;
-    currentUrl = new URL(location, currentUrl);
-    if (!allowedHosts.has(currentUrl.hostname.toLowerCase())) {
-      throw new HTTPException(400, { message: "Facebook import redirected to an unsupported host." });
-    }
-  }
-  if (!response?.ok) {
-    throw new HTTPException(400, { message: `Facebook returned ${response?.status ?? "no response"}. Make sure this is a public event link.` });
-  }
-  const contentType = response.headers.get("content-type") ?? "";
-  if (contentType && !contentType.toLowerCase().includes("text/html")) {
-    throw new HTTPException(400, { message: "Facebook import expected an HTML page." });
-  }
-  const html = (await response.text()).slice(0, 3_000_000);
-  const plainText = stripTags(html);
-  const jsonLdEvent = jsonLdObjects(html).map(findJsonLdEvent).find(Boolean);
-  const title = firstString(jsonLdEvent?.name) ?? titleFromHtml(html) ?? "Imported Facebook Event";
-  const metaDescription = metaContent(html, "og:description") ?? metaContent(html, "description") ?? "";
-  const description = firstString(jsonLdEvent?.description) ?? metaDescription;
-  const imageSrc = firstString(jsonLdEvent?.image) ?? metaContent(html, "og:image");
-  const location = jsonLdEvent?.location && typeof jsonLdEvent.location === "object" ? jsonLdEvent.location as Record<string, unknown> : undefined;
-  const address = location?.address && typeof location.address === "object" ? location.address as Record<string, unknown> : undefined;
-  const locationName = firstString(location?.name);
-  const locationText = [firstString(address?.streetAddress), firstString(address?.addressLocality), firstString(address?.addressRegion), firstString(address?.postalCode)]
-    .filter(Boolean)
-    .join(", ");
-  const startFromMeta = metaContent(html, "event:start_time") ?? metaContent(html, "startDate");
-  const endFromMeta = metaContent(html, "event:end_time") ?? metaContent(html, "endDate");
-  const humanStart = parseHumanDate(`${description} ${metaDescription} ${plainText}`, timeZone);
-  const startsAt = toConfiguredTimeZoneIso(firstString(jsonLdEvent?.startDate) ?? startFromMeta, timeZone)
-    ?? humanStart?.iso;
-  const endsAt = toConfiguredTimeZoneIso(firstString(jsonLdEvent?.endDate) ?? endFromMeta, timeZone);
-
-  if (!startsAt) {
-    throw new HTTPException(422, { message: "Could not extract an event start date/time from the public Facebook page. The page may require login or hide event metadata." });
-  }
-
-  const slug = slugifyImport(title);
-  return EventSchema.parse({
-    id: slug,
-    status: "draft",
-    title,
-    slug,
-    startsAt,
-    endsAt,
-    locationName,
-    address: locationText || undefined,
-    image: imageSrc ? { src: imageSrc, alt: title } : undefined,
-    description: description || `Imported from Facebook: ${initialUrl.toString()}`,
-    notes: [
-      `Imported from Facebook: ${initialUrl.toString()}`,
-      humanStart && !humanStart.hasTime ? "Facebook public metadata did not expose a start time; verify the event time before publishing." : undefined
-    ].filter(Boolean).join("\n")
-  });
-}
 
 function localizedPage(basePage: Page, locale: string): Page {
   return PageSchema.parse({
