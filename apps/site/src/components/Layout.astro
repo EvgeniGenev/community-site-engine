@@ -37,6 +37,8 @@ const switcherItems = languages.map((language) => {
   return { language, href, available: !!translatedPage, active: language.code === page.locale };
 });
 const htmlLang: Locale = page.locale;
+const maxWidth = settings.headerMaxWidth ?? 1160;
+const maxCss = `:root { --max: ${maxWidth}px; } body { overflow-x: hidden; }`;
 ---
 <!doctype html>
 <html lang={htmlLang}>
@@ -50,6 +52,7 @@ const htmlLang: Locale = page.locale;
       stylesheet.css.trim() && <style data-cms-css={stylesheet.key} set:html={stylesheet.css} />
     ))}
     <style data-cms-fonts set:html={fontCss} />
+    <style data-cms-max set:html={maxCss} />
   </head>
   <body>
     <header class="site-header">

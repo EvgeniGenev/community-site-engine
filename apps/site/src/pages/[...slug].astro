@@ -18,5 +18,5 @@ const articles = await getArticles("en");
 const galleryItems = await getGallery("en");
 ---
 <Layout page={page} settings={settings} navigation={navigation}>
-  <Blocks blocks={page.blocks} layout={page.layout} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} />
+  <Blocks blocks={page.blocks} layout={page.layout} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} locale={page.locale} />
 </Layout>

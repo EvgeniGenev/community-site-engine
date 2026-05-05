@@ -374,6 +374,7 @@ export const SiteSettingsSchema = z.object({
   ]),
   locales: z.array(LocaleSchema).optional(),
   eventTimeZone: z.string().min(1).default("America/Phoenix"),
+  headerMaxWidth: z.number().int().min(600).max(2400).optional(),
   fonts: FontSettingsSchema.default({ default: "universal-serif" }),
   contactEmail: z.string().email(),
   social: z.array(LinkSchema).default([])

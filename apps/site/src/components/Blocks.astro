@@ -8,9 +8,10 @@ interface Props {
   articles: Article[];
   galleryItems: MediaRef[];
   eventTimeZone: string;
+  locale?: string;
 }
 
-const { blocks, layout, events, articles, galleryItems, eventTimeZone } = Astro.props;
+const { blocks, layout, events, articles, galleryItems, eventTimeZone, locale = "en" } = Astro.props;
 const activeLayout = layout ?? { columns: [{ id: "main", label: "Main", width: 100 }] };
 const hasMultiColumnLayout = activeLayout.columns.length > 1;
 const columnIds = new Set(activeLayout.columns.map((column) => column.id));
@@ -110,6 +111,14 @@ function blockStyle(block: PageBlock) {
   const requestedColumn = block.layoutColumn && columnIds.has(block.layoutColumn) ? block.layoutColumn : activeLayout.columns[0]?.id;
   const columnIndex = Math.max(0, activeLayout.columns.findIndex((column) => column.id === requestedColumn));
   return `${base}${base.trim().endsWith(";") || !base.trim() ? "" : ";"} grid-column: ${columnIndex + 1};`;
+}
+
+function eventHref(event: Event) {
+  return locale === "en" ? `/events/${event.slug}/` : `/${locale}/sabitiya/${event.slug}/`;
+}
+
+function truncate(text: string, max = 120) {
+  return text.length <= max ? text : text.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
 
 const galleryScripts: string[] = [];
@@ -220,11 +229,12 @@ const eventScripts: string[] = [];
                   <span>{datePart(event.startsAt, "month", { month: "short", day: "2-digit" })}</span>
                   <strong>{Number(datePart(event.startsAt, "day", { month: "short", day: "2-digit" }))}</strong>
                 </div>
-                <div>
+                <div class="event-card-body">
+                  {event.image?.src && <img class="event-card-img" src={event.image.src} alt={event.image.alt} loading="lazy" />}
                   <h3>{event.title}</h3>
                   <p class="meta">{formatDate(event.startsAt)}{event.address ? ` · ${event.address}` : ""}</p>
-                  <p>{event.description}</p>
-                  {event.notes && <p><strong>Note:</strong> {event.notes}</p>}
+                  <p>{truncate(event.description)}</p>
+                  <a href={eventHref(event)} class="event-see-more">{locale === "en" ? "See more →" : "Виж повече →"}</a>
                 </div>
               </article>
             ))}
@@ -239,11 +249,12 @@ const eventScripts: string[] = [];
                 <span>{datePart(event.startsAt, "month", { month: "short", day: "2-digit" })}</span>
                 <strong>{Number(datePart(event.startsAt, "day", { month: "short", day: "2-digit" }))}</strong>
               </div>
-              <div>
+              <div class="event-card-body">
+                {event.image?.src && <img class="event-card-img" src={event.image.src} alt={event.image.alt} loading="lazy" />}
                 <h3>{event.title}</h3>
                 <p class="meta">{formatDate(event.startsAt)}{event.address ? ` · ${event.address}` : ""}</p>
-                <p>{event.description}</p>
-                {event.notes && <p><strong>Note:</strong> {event.notes}</p>}
+                <p>{truncate(event.description)}</p>
+                <a href={eventHref(event)} class="event-see-more">{locale === "en" ? "See more →" : "Виж повече →"}</a>
               </div>
             </article>
           ))}

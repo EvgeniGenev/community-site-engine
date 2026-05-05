@@ -146,6 +146,7 @@ interface SiteSettings {
   supportedLanguages: LanguageOption[];
   locales?: string[];
   eventTimeZone: string;
+  headerMaxWidth?: number | undefined;
   fonts: {
     default: FontId;
     page?: FontId | undefined;
@@ -2106,6 +2107,21 @@ function App() {
                 <select value={settings.data.eventTimeZone ?? "America/Phoenix"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, eventTimeZone: event.target.value } })}>
                   {timeZones.map((zone) => <option value={zone} key={zone}>{zone}</option>)}
                 </select>
+              </label>
+              <label className="field">
+                <span>Header max width (px)</span>
+                <small>Controls the maximum width of the site header. Default is 1160px. Range: 600–2400.</small>
+                <input
+                  type="number"
+                  min={600}
+                  max={2400}
+                  step={20}
+                  value={settings.data.headerMaxWidth ?? 1160}
+                  onChange={(event) => {
+                    const val = parseInt(event.target.value, 10);
+                    setSettings({ ...settings, data: { ...settings.data, headerMaxWidth: Number.isFinite(val) ? val : undefined } });
+                  }}
+                />
               </label>
               <section className="fontPicker">
                 <div>
