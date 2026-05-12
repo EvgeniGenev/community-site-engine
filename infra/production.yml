@@ -119,6 +119,29 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
+  StrictSecurityHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub ${SiteName}-security-headers-${AWS::Region}-${AWS::AccountId}
+        Comment: Policy enforcing strict Content Security Policy and HTTP security headers
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https:; frame-src 'self' https:;"
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Override: true
+
   SiteDistribution:
     Type: AWS::CloudFront::Distribution
     DependsOn:
@@ -139,6 +162,7 @@ Resources:
         DefaultCacheBehavior:
           TargetOriginId: site-origin
           ViewerProtocolPolicy: redirect-to-https
+          ResponseHeadersPolicyId: !Ref StrictSecurityHeadersPolicy
           AllowedMethods: [GET, HEAD, OPTIONS]
           CachedMethods: [GET, HEAD, OPTIONS]
           Compress: true
@@ -198,6 +222,7 @@ Resources:
         DefaultCacheBehavior:
           TargetOriginId: admin-origin
           ViewerProtocolPolicy: redirect-to-https
+          ResponseHeadersPolicyId: !Ref StrictSecurityHeadersPolicy
           AllowedMethods: [GET, HEAD, OPTIONS]
           CachedMethods: [GET, HEAD, OPTIONS]
           Compress: true

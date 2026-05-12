@@ -154,6 +154,8 @@ When transitioning from local development to production with AWS Cognito, the CM
    - **Designer:** Full structural and content access (`read`, `writeContent`, `writeStructure`, `delete`, `media`), blocked from global configuration (`settings`).
    - **Contributor:** Dedicated content editing capabilities (`read`, `writeContent`, `delete`, `media`), blocked from editing layout components (`writeStructure`) or site settings.
 5. **Origin Restrictions:** Overriding permissive local CORS headers by explicitly setting `ADMIN_ALLOWED_ORIGINS` to the authenticated production Admin SPA domain blocks malicious cross-origin requests.
+6. **Strict Content Security Policy (CSP) Delivery:** Both the public-facing static site distributions and the backend Hono API handlers deliver rigorous `Content-Security-Policy` headers restricting external script and style loading strictly to trusted origins (`'self'`), mitigating client-side injection and cross-site scripting threats.
+
 
 ## Ongoing Code Changes
 

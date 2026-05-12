@@ -1183,6 +1183,14 @@ app.use("*", cors({
   maxAge: 600
 }));
 
+app.use("*", async (c, next) => {
+  c.header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; object-src 'none';");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  await next();
+});
+
+
 app.use("/api/*", async (c, next) => {
   const user = await authenticate(storage, c.req.header("authorization"));
   if (!user) {
