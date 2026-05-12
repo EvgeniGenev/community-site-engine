@@ -6,8 +6,17 @@ import "./styles/app.css";
 type Role = "admin" | "designer" | "contributor";
 type Collection = "pages" | "articles" | "events" | "navigation" | "settings" | "gallery";
 type Tab = "pages" | "menu" | "events" | "articles" | "gallery" | "css" | "settings" | "users" | "json" | "translations";
-type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta";
+type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta" | "fileList";
 type MediaFolder = "gallery" | "events" | "articles" | "settings";
+
+interface GalleryAlbum {
+  id: string;
+  title: string;
+  description?: string;
+  status: "draft" | "published";
+  coverImage?: string;
+  items: MediaRef[];
+}
 
 interface CmsObject<T = unknown> {
   key: string;
@@ -62,6 +71,7 @@ interface PageBlock {
   items?: MediaRef[] | undefined;
   eventIds?: string[] | undefined;
   articleIds?: string[] | undefined;
+  files?: Array<{ src: string; label: string; description?: string }> | undefined;
 }
 
 interface Page {
@@ -645,7 +655,7 @@ function ImageField(props: { label: string; value: MediaRef | undefined; onChang
   );
 }
 
-function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; update: (block: PageBlock) => void; remove: () => void; onUpload: (folder: MediaFolder) => Promise<MediaRef | null> }) {
+function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; update: (block: PageBlock) => void; remove: () => void; onUpload: (folder: MediaFolder) => Promise<MediaRef | null>; onUploadFile?: () => Promise<{ src: string; label: string } | null> }) {
   const block = props.block;
   return (
     <section className="builderCard blockCard">
@@ -704,6 +714,42 @@ function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; upda
           const ids = value.split("\n").map((item) => item.trim()).filter(Boolean);
           props.update(block.type === "eventList" ? { ...block, eventIds: ids } : { ...block, articleIds: ids });
         }} />
+      )}
+
+      {block.type === "fileList" && (
+        <>
+          <TextArea label="Intro" value={block.intro} onChange={(intro) => props.update({ ...block, intro })} />
+          <div className="fileListEditor">
+            {(block.files ?? []).map((file, index) => (
+              <div className="fileListItem" key={`${file.src}-${index}`}>
+                <TextField label="Display label" value={file.label} onChange={(label) => {
+                  const files = [...(block.files ?? [])];
+                  files[index] = { ...file, label };
+                  props.update({ ...block, files });
+                }} />
+                <TextField label="File URL" value={file.src} onChange={(src) => {
+                  const files = [...(block.files ?? [])];
+                  files[index] = { ...file, src };
+                  props.update({ ...block, files });
+                }} />
+                <TextArea label="Description (optional)" rows={2} value={file.description} onChange={(description) => {
+                  const files = [...(block.files ?? [])];
+                  files[index] = { ...file, description };
+                  props.update({ ...block, files });
+                }} />
+                <button className="danger small" onClick={() => {
+                  props.update({ ...block, files: (block.files ?? []).filter((_, i) => i !== index) });
+                }}>Remove File</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={async () => {
+            const result = await props.onUploadFile?.();
+            if (result) {
+              props.update({ ...block, files: [...(block.files ?? []), { src: result.src, label: result.label }] });
+            }
+          }}>Upload File (PDF, DOCX, XLSX…)</button>
+        </>
       )}
 
       {block.type === "cta" && (
@@ -844,6 +890,9 @@ function App() {
   const [events, setEvents] = useState<CmsObject<EventItem>[]>([]);
   const [articles, setArticles] = useState<CmsObject<Article>[]>([]);
   const [gallery, setGallery] = useState<CmsObject<MediaRef[]> | null>(null);
+  const [albums, setAlbums] = useState<CmsObject<GalleryAlbum>[]>([]);
+  const [selectedAlbumKey, setSelectedAlbumKey] = useState<string>("");
+  const [albumDraft, setAlbumDraft] = useState<GalleryAlbum | null>(null);
   const [settings, setSettings] = useState<CmsObject<SiteSettings> | null>(null);
   const [navigation, setNavigation] = useState<CmsObject<Navigation> | null>(null);
   const [menuRows, setMenuRows] = useState<MenuRow[]>([]);
@@ -892,14 +941,18 @@ function App() {
         request<CmsObject<Page>[]>(activeToken, `/api/list/pages?locale=${locale}`),
         request<CmsObject<EventItem>[]>(activeToken, "/api/list/events"),
         request<CmsObject<Article>[]>(activeToken, `/api/list/articles?locale=${locale}`),
-        request<CmsObject<MediaRef[]>[]>(activeToken, "/api/list/gallery"),
+        request<CmsObject<unknown>[]>(activeToken, "/api/list/gallery"),
         request<CmsObject<SiteSettings>[]>(activeToken, "/api/list/settings"),
         request<CmsObject<Navigation>[]>(activeToken, `/api/list/navigation?locale=${locale}`)
       ]);
       setPages(loadedPages);
       setEvents(loadedEvents);
       setArticles(loadedArticles);
-      setGallery(loadedGallery.find((item) => item.key === "gallery/gallery-items.json") ?? loadedGallery[0] ?? null);
+      // Separate flat legacy gallery from named albums
+      const legacyGallery = loadedGallery.find((item) => item.key === "gallery/gallery-items.json") ?? null;
+      setGallery(legacyGallery as CmsObject<MediaRef[]> | null);
+      const albumItems = loadedGallery.filter((item) => item.key !== "gallery/gallery-items.json") as CmsObject<GalleryAlbum>[];
+      setAlbums(albumItems.sort((a, b) => (a.data as GalleryAlbum).title?.localeCompare((b.data as GalleryAlbum).title ?? "") ?? 0));
       const siteSettings = loadedSettings.find((item) => item.key === "settings/site.json") ?? null;
       setSettings(siteSettings);
       const menu = loadedNavigation.find((item) => item.key === `navigation/${locale}/main.json`) ?? loadedNavigation[0] ?? null;
@@ -1143,6 +1196,29 @@ function App() {
     return result;
   }
 
+  async function uploadFile(): Promise<{ src: string; label: string } | null> {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.zip";
+    const file = await new Promise<File | null>((resolve) => {
+      input.onchange = () => resolve(input.files?.[0] ?? null);
+      input.click();
+    });
+    if (!file) return null;
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    const result = await request<{ src: string; label: string }>(token, "/api/files", {
+      method: "POST",
+      body: JSON.stringify({ filename: file.name, contentType: file.type, base64 })
+    });
+    setMessage(`Uploaded ${file.name}`);
+    return result;
+  }
+
   async function triggerSiteBuildMessage() {
     try {
       const result = await request<{ ok: boolean; message?: string; status?: number }>(token, "/api/build-webhook", { method: "POST" });
@@ -1246,6 +1322,35 @@ function App() {
     setGallery({ key, data: items });
     const buildMessage = await triggerSiteBuildMessage();
     setMessage(`Saved gallery.${buildMessage}`);
+    await refresh();
+  }
+
+  async function saveAlbum(album: GalleryAlbum) {
+    const key = `gallery/${album.id}.json`;
+    await request(token, `/api/object/gallery/${key}`, { method: "PUT", body: JSON.stringify(album) });
+    setAlbumDraft(album);
+    const buildMessage = await triggerSiteBuildMessage();
+    setMessage(`Saved album "${album.title}".${buildMessage}`);
+    await refresh();
+  }
+
+  async function createAlbum() {
+    const title = prompt("New gallery name:")?.trim();
+    if (!title) return;
+    const id = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const album: GalleryAlbum = { id, title, status: "published", items: [] };
+    await saveAlbum(album);
+    setSelectedAlbumKey(`gallery/${id}.json`);
+    setAlbumDraft(album);
+  }
+
+  async function deleteAlbum(key: string, title: string) {
+    if (!confirm(`Delete gallery "${title}"? Images in storage will NOT be deleted.`)) return;
+    await request(token, `/api/object/gallery/${key}`, { method: "DELETE" });
+    setSelectedAlbumKey("");
+    setAlbumDraft(null);
+    const buildMessage = await triggerSiteBuildMessage();
+    setMessage(`Deleted gallery "${title}".${buildMessage}`);
     await refresh();
   }
 
@@ -1818,6 +1923,7 @@ function App() {
                             block={{ ...block, layoutColumn: column.id }}
                             disabledStructure={!structureAllowed}
                             onUpload={uploadMedia}
+                            onUploadFile={uploadFile}
                             update={(updated) => setPage({ ...page, blocks: page.blocks.map((item, itemIndex) => itemIndex === index ? { ...updated, layoutColumn: column.id } : item) })}
                             remove={() => setPage({ ...page, blocks: page.blocks.filter((_, itemIndex) => itemIndex !== index) })}
                           />
@@ -1830,7 +1936,7 @@ function App() {
             )}
             {structureAllowed && (
               <div className="builderCard addBlock">
-                {(["hero", "richText", "cardGrid", "gallery", "eventList", "articleList", "cta"] as BlockType[]).map((type) => (
+                {(["hero", "richText", "cardGrid", "gallery", "eventList", "articleList", "cta", "fileList"] as BlockType[]).map((type) => (
                   <button key={type} onClick={() => setPage({ ...page, blocks: [...page.blocks, { type, title: `New ${type}`, layoutColumn: currentPageLayout?.columns[0]?.id ?? "main" }] })}>Add {type}</button>
                 ))}
               </div>
@@ -1876,6 +1982,7 @@ function App() {
               {menuDisplayRows.map((row) => {
                 const siblings = menuRows.filter((item) => item.parentId === row.parentId).sort((a, b) => a.sort - b.sort);
                 const siblingIndex = siblings.findIndex((item) => item.id === row.id);
+                const hasChildren = menuRows.some((item) => item.parentId === row.id);
                 return (
                   <article className="menuItem" style={{ "--menu-depth": row.depth } as CSSProperties} key={row.id}>
                     <div className="menuDrag">
@@ -1885,11 +1992,12 @@ function App() {
                     </div>
                     <div className="menuFields">
                       <TextField label="Menu label" value={row.label} onChange={(label) => updateMenuRow(row.id, { label })} />
-                      <TextField label="Link URL" value={row.href} onChange={(href) => updateMenuRow(row.id, { href })} />
+                      <TextField label="Link URL" value={row.href} disabled={hasChildren} onChange={(href) => updateMenuRow(row.id, { href })} />
                       <label className="field">
                         <span>Use page link</span>
                         <select
                           value=""
+                          disabled={hasChildren}
                           onChange={(event) => {
                             const pageItem = pages.find((item) => item.key === event.target.value)?.data;
                             if (pageItem) updateMenuRow(row.id, { label: pageItem.title, href: pageHref(pageItem) });
@@ -2001,60 +2109,128 @@ function App() {
         )}
 
         {tab === "gallery" && (
-          <>
-            <header className="editorHeader">
-              <h2>Gallery</h2>
-              <button onClick={async () => {
-                const media = await uploadMedia("gallery");
-                if (media) await saveGallery([...(gallery?.data ?? []), { ...media, status: "draft" }]);
-              }}>Upload Gallery Image</button>
-            </header>
-            <p className="muted">Editing gallery text for {workingLanguageName}. Only published gallery images appear on the public site; new uploads start as drafts.</p>
-            <div className="galleryManager">
-              {(gallery?.data ?? []).map((item, index) => (
-                <figure className="galleryItem" key={`${item.src}-${index}`}>
-                  <img src={item.src} alt={mediaText(item, "alt")} />
-                  <label className="field">
-                    <span>Status</span>
-                    <select value={item.status ?? "published"} onChange={(event) => {
-                      const items = [...(gallery?.data ?? [])];
-                      items[index] = { ...item, status: event.target.value as MediaRef["status"] };
-                      setGallery(gallery ? { ...gallery, data: items } : null);
-                    }}>
-                      <option value="draft">Draft - hidden from public site</option>
-                      <option value="published">Published - visible on public site</option>
-                    </select>
-                  </label>
-                  <TextField label="Image URL (shared)" value={item.src} onChange={(src) => {
-                    const items = [...(gallery?.data ?? [])];
-                    items[index] = { ...item, src };
-                    setGallery(gallery ? { ...gallery, data: items } : null);
-                  }} />
-                  <TextField label="Alt text" value={mediaText(item, "alt")} onChange={(alt) => {
-                    const items = [...(gallery?.data ?? [])];
-                    items[index] = withMediaText(item, "alt", alt);
-                    setGallery(gallery ? { ...gallery, data: items } : null);
-                  }} />
-                  <TextArea label="Description text" value={mediaText(item, "description")} rows={4} onChange={(description) => {
-                    const items = [...(gallery?.data ?? [])];
-                    items[index] = withMediaText(item, "description", description);
-                    setGallery(gallery ? { ...gallery, data: items } : null);
-                  }} />
-                  <TextField label="Caption" value={mediaText(item, "caption")} onChange={(caption) => {
-                    const items = [...(gallery?.data ?? [])];
-                    items[index] = withMediaText(item, "caption", caption);
-                    setGallery(gallery ? { ...gallery, data: items } : null);
-                  }} />
-                  <button className="danger" onClick={async () => {
-                    if (!confirm("Remove this image from the gallery? Uploaded local media files will also be deleted from storage.")) return;
-                    if (item.src.startsWith("/media/")) await deleteMediaFromStorage(item.src);
-                    await saveGallery((gallery?.data ?? []).filter((_, itemIndex) => itemIndex !== index));
-                  }}>Delete Image</button>
-                </figure>
-              ))}
+          <div className="galleryShell">
+            {/* ── Left: album list ── */}
+            <aside className="albumSidebar">
+              <div className="albumSidebarHeader">
+                <strong>Galleries</strong>
+                <button className="small" onClick={() => void createAlbum()}>+ New</button>
+              </div>
+              {albums.length === 0 && <p className="muted" style={{padding:"0.5rem"}}>No galleries yet.</p>}
+              {albums.map((item) => {
+                const album = item.data as GalleryAlbum;
+                return (
+                  <button
+                    key={item.key}
+                    className={selectedAlbumKey === item.key ? "albumBtn active" : "albumBtn"}
+                    onClick={() => { setSelectedAlbumKey(item.key); setAlbumDraft(structuredClone(album)); }}
+                  >
+                    <span>{album.title}</span>
+                    <span className="albumCount">{album.items.length}</span>
+                  </button>
+                );
+              })}
+            </aside>
+
+            {/* ── Right: album editor ── */}
+            <div className="albumEditor">
+              {!albumDraft ? (
+                <div className="emptyState">
+                  <h2>Select a gallery</h2>
+                  <p>Choose a gallery from the left, or create a new one.</p>
+                </div>
+              ) : (
+                <>
+                  <header className="editorHeader">
+                    <h2>{albumDraft.title}</h2>
+                    <button onClick={async () => {
+                      const media = await uploadMedia("gallery");
+                      if (!media || !albumDraft) return;
+                      const updated = { ...albumDraft, items: [...albumDraft.items, { ...media, status: "published" as const }] };
+                      setAlbumDraft(updated);
+                      await saveAlbum(updated);
+                    }}>Upload Image</button>
+                    <button onClick={() => albumDraft && void saveAlbum(albumDraft)}>Save Changes</button>
+                    <button className="danger" onClick={() => selectedAlbumKey && albumDraft && void deleteAlbum(selectedAlbumKey, albumDraft.title)}>Delete Gallery</button>
+                  </header>
+
+                  <div className="builderCard">
+                    <TextField label="Gallery title" value={albumDraft.title} onChange={(title) => setAlbumDraft({ ...albumDraft, title })} />
+                    <TextArea label="Description" value={albumDraft.description} rows={2} onChange={(description) => setAlbumDraft({ ...albumDraft, description })} />
+                    <label className="field">
+                      <span>Status</span>
+                      <select value={albumDraft.status} onChange={(e) => setAlbumDraft({ ...albumDraft, status: e.target.value as GalleryAlbum["status"] })}>
+                        <option value="published">Published</option>
+                        <option value="draft">Draft (hidden from site)</option>
+                      </select>
+                    </label>
+                    <p className="muted">Editing for {workingLanguageName}. Only published images appear on the public site.</p>
+                  </div>
+
+                  <div className="galleryManager">
+                    {albumDraft.items.map((item, index) => (
+                      <figure className="galleryItem" key={`${item.src}-${index}`}>
+                        <img src={item.src} alt={mediaText(item, "alt")} />
+                        <label className="field">
+                          <span>Status</span>
+                          <select value={item.status ?? "published"} onChange={(e) => {
+                            const items = [...albumDraft.items];
+                            items[index] = { ...item, status: e.target.value as MediaRef["status"] };
+                            setAlbumDraft({ ...albumDraft, items });
+                          }}>
+                            <option value="published">Published</option>
+                            <option value="draft">Draft</option>
+                          </select>
+                        </label>
+                        <TextField label="Alt text" value={mediaText(item, "alt")} onChange={(alt) => {
+                          const items = [...albumDraft.items];
+                          items[index] = withMediaText(item, "alt", alt);
+                          setAlbumDraft({ ...albumDraft, items });
+                        }} />
+                        <TextField label="Caption" value={mediaText(item, "caption")} onChange={(caption) => {
+                          const items = [...albumDraft.items];
+                          items[index] = withMediaText(item, "caption", caption);
+                          setAlbumDraft({ ...albumDraft, items });
+                        }} />
+                        <label className="field">
+                          <span>Move to gallery</span>
+                          <select value="" onChange={async (e) => {
+                            const targetKey = e.target.value;
+                            if (!targetKey || !albumDraft) return;
+                            const targetAlbum = (albums.find((a) => a.key === targetKey)?.data) as GalleryAlbum | undefined;
+                            if (!targetAlbum) return;
+                            if (!confirm(`Move this image to "${targetAlbum.title}"?`)) return;
+                            // Remove from current album
+                            const updatedCurrent = { ...albumDraft, items: albumDraft.items.filter((_, i) => i !== index) };
+                            // Add to target album
+                            const updatedTarget = { ...targetAlbum, items: [...targetAlbum.items, item] };
+                            await saveAlbum(updatedCurrent);
+                            await saveAlbum(updatedTarget);
+                            setAlbumDraft(updatedCurrent);
+                          }}>
+                            <option value="">Keep here</option>
+                            {albums.filter((a) => a.key !== selectedAlbumKey).map((a) => (
+                              <option key={a.key} value={a.key}>{(a.data as GalleryAlbum).title}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <button className="danger small" onClick={async () => {
+                          if (!confirm("Remove this image? Uploaded media files will also be deleted from storage.")) return;
+                          if (item.src.startsWith("/media/")) await deleteMediaFromStorage(item.src);
+                          const updated = { ...albumDraft, items: albumDraft.items.filter((_, i) => i !== index) };
+                          setAlbumDraft(updated);
+                          await saveAlbum(updated);
+                        }}>Remove Image</button>
+                      </figure>
+                    ))}
+                    {albumDraft.items.length === 0 && (
+                      <p className="muted" style={{gridColumn:"1/-1",textAlign:"center",padding:"2rem"}}>No images yet. Click "Upload Image" to add some.</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-            <button onClick={() => saveGallery(gallery?.data ?? [])}>Save Gallery Captions</button>
-          </>
+          </div>
         )}
 
         {tab === "css" && (user?.role === "admin" || user?.role === "designer") && (

@@ -1,0 +1,164 @@
+---
+import Layout from "../../../components/Layout.astro";
+import { getArticles, getNavigation, getSettings } from "../../../content";
+
+export async function getStaticPaths() {
+  const articles = await getArticles("bg");
+  return articles.map((article) => ({
+    params: { slug: article.slug }
+  }));
+}
+
+const { slug } = Astro.params;
+const settings = await getSettings();
+const navigation = await getNavigation("bg");
+const articles = await getArticles("bg");
+const article = articles.find((a) => a.slug === slug);
+if (!article) return Astro.redirect("/404.html", 302);
+
+function escapeHtml(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function escapeAttribute(value: string) {
+  return escapeHtml(value).replaceAll("\"", "&quot;");
+}
+
+function safeMarkdownHref(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("#")) return trimmed;
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) return trimmed;
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return trimmed.includes(":") ? "" : trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "mailto:" ? trimmed : "";
+  } catch {
+    return "";
+  }
+}
+
+function inlineMarkdown(value: string) {
+  return value
+    .replace(/&(?![a-zA-Z0-9#]+;)/g, "&amp;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) => {
+      const safeHref = safeMarkdownHref(href);
+      return safeHref ? `<a href="${escapeAttribute(safeHref)}">${label}</a>` : label;
+    });
+}
+
+function markdownToHtml(body?: string) {
+  const lines = (body ?? "").split("\n");
+  const html: string[] = [];
+  let listOpen = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (listOpen) {
+        html.push("</ul>");
+        listOpen = false;
+      }
+      continue;
+    }
+    if (trimmed.startsWith("### ")) {
+      if (listOpen) html.push("</ul>");
+      listOpen = false;
+      html.push(`<h3>${inlineMarkdown(trimmed.slice(4))}</h3>`);
+    } else if (trimmed.startsWith("## ")) {
+      if (listOpen) html.push("</ul>");
+      listOpen = false;
+      html.push(`<h2>${inlineMarkdown(trimmed.slice(3))}</h2>`);
+    } else if (trimmed.startsWith("- ")) {
+      if (!listOpen) {
+        html.push("<ul>");
+        listOpen = true;
+      }
+      html.push(`<li>${inlineMarkdown(trimmed.slice(2))}</li>`);
+    } else {
+      if (listOpen) html.push("</ul>");
+      listOpen = false;
+      html.push(`<p>${inlineMarkdown(trimmed)}</p>`);
+    }
+  }
+  if (listOpen) html.push("</ul>");
+  return html.join("");
+}
+
+const fakePage = {
+  id: article.id,
+  locale: "bg" as const,
+  status: "published" as const,
+  title: article.title,
+  slug: `novini-i-statii/${article.slug}`,
+  translationKey: `article-${article.id}`,
+  seo: article.seo ?? {
+    title: `${article.title} | ${settings.name}`,
+    description: article.excerpt.slice(0, 160)
+  },
+  layout: { columns: [{ id: "main", label: "Main", width: 100 }] },
+  blocks: []
+};
+---
+<Layout page={fakePage} settings={settings} navigation={navigation}>
+  <article class="section article-detail">
+    {article.featuredImage?.src && (
+      <div class="article-detail-image">
+        <img src={article.featuredImage.src} alt={article.featuredImage.alt} />
+      </div>
+    )}
+    <p class="eyebrow article-detail-eyebrow">{article.category} · {article.date}</p>
+    <h1 class="article-detail-title">{article.title}</h1>
+    <div class="article-detail-body prose" set:html={markdownToHtml(article.body)} />
+    <a href="/bg/novini-i-statii/" class="button primary article-back-link">← Назад към новини и статии</a>
+  </article>
+</Layout>
+
+<style>
+  .article-detail {
+    max-width: 860px;
+    margin: 0 auto;
+    padding-top: 48px;
+    padding-bottom: 72px;
+  }
+  .article-detail-image img {
+    width: 100%;
+    max-height: 480px;
+    object-fit: cover;
+    border-radius: 24px;
+    margin-bottom: 32px;
+    box-shadow: 0 16px 48px rgba(35,31,32,.14);
+  }
+  .article-detail-eyebrow {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  .article-detail-title {
+    font-size: clamp(28px, 5vw, 52px);
+    margin: 0 0 24px;
+  }
+  .article-detail-body {
+    font-size: 18px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+  .article-detail-body :global(p) {
+    margin-bottom: 16px;
+  }
+  .article-detail-body :global(h2), .article-detail-body :global(h3) {
+    color: var(--foreground);
+    margin-top: 32px;
+    margin-bottom: 16px;
+  }
+  .article-detail-body :global(ul) {
+    margin-bottom: 16px;
+    padding-left: 24px;
+  }
+  .article-detail-body :global(li) {
+    margin-bottom: 8px;
+  }
+  .article-back-link {
+    display: inline-flex;
+    margin-top: 48px;
+  }
+</style>

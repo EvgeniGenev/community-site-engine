@@ -1,4 +1,4 @@
-import { ArticleSchema, EventSchema, GallerySchema, NavigationSchema, PageSchema, SiteSettingsSchema, type Article, type Event, type Gallery, type Locale, type MediaRef, type Navigation, type Page, type SiteSettings } from "@community-site-engine/shared";
+import { ArticleSchema, EventSchema, GalleryAlbumSchema, GallerySchema, NavigationSchema, PageSchema, SiteSettingsSchema, type Article, type Event, type Gallery, type GalleryAlbum, type Locale, type MediaRef, type Navigation, type Page, type SiteSettings } from "@community-site-engine/shared";
 import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -149,6 +149,29 @@ export async function getGallery(locale: Locale): Promise<Gallery> {
   if (locale === "en") return publishedGallery;
   return publishedGallery.map((item) => localizeMedia(item, locale));
 }
+
+export async function getGalleryAlbums(locale: Locale): Promise<GalleryAlbum[]> {
+  const galleryDir = join(contentRoot, "gallery");
+  const files = (await readdir(galleryDir).catch(() => [])).filter(
+    (file) => file.endsWith(".json") && file !== "gallery-items.json"
+  );
+  const albums: GalleryAlbum[] = [];
+  for (const file of files) {
+    try {
+      const raw = await readFile(join(galleryDir, file), "utf8");
+      const parsed = GalleryAlbumSchema.parse(JSON.parse(raw));
+      if (parsed.status !== "published") continue;
+      const localizedItems = parsed.items
+        .filter((item) => item.status === "published")
+        .map((item) => locale === "en" ? item : localizeMedia(item, locale));
+      albums.push({ ...parsed, items: localizedItems });
+    } catch (e) {
+      console.error(`Error parsing gallery/${file}:`, e);
+    }
+  }
+  return albums.sort((a, b) => a.title.localeCompare(b.title));
+}
+
 
 export function localizeMedia<T extends MediaRef>(item: T, locale: Locale): T {
   if (locale === "en") return item;

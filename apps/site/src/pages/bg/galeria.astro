@@ -1,0 +1,449 @@
+---
+import Layout from "../../components/Layout.astro";
+import { getGalleryAlbums, getNavigation, getSettings } from "../../content";
+
+const settings = await getSettings();
+const navigation = await getNavigation("bg");
+const albums = await getGalleryAlbums("bg");
+
+const galleryPage = {
+  id: "galeria",
+  locale: "bg" as const,
+  status: "published" as const,
+  title: "Галерия",
+  slug: "galeria",
+  translationKey: "gallery",
+  seo: {
+    title: `Галерия | ${settings.name}`,
+    description: "Разгледайте нашите фотогалерии."
+  },
+  layout: { columns: [{ id: "main", label: "Main", width: 100 }] },
+  blocks: []
+};
+---
+<Layout page={galleryPage} settings={settings} navigation={navigation}>
+  <div class="gallery-page">
+    <aside class="gallery-sidebar" id="gallery-sidebar">
+      <h2>Галерии</h2>
+      <nav class="album-list" role="list">
+        {albums.map((album) => (
+          <button
+            class="album-btn"
+            data-album-id={album.id}
+            data-album-title={album.title}
+            role="listitem"
+          >
+            {album.title}
+            <span class="album-count">({album.items.length})</span>
+          </button>
+        ))}
+      </nav>
+    </aside>
+
+    <main class="gallery-main" id="gallery-main">
+      <header class="gallery-main-header">
+        <h1 id="gallery-album-title">Изберете галерия</h1>
+        <p id="gallery-album-desc" class="gallery-album-desc"></p>
+      </header>
+
+      {albums.map((album) => (
+        <div
+          class="album-images"
+          id={`album-${album.id}`}
+          data-album={album.id}
+          hidden
+        >
+          {album.items.map((item, index) => (
+            <figure
+              class="gallery-thumb"
+              data-page={Math.floor(index / 9) + 1}
+            >
+              <button
+                type="button"
+                class="gallery-open"
+                data-src={item.src}
+                data-alt={item.alt}
+                data-caption={item.caption ?? item.description ?? ""}
+              >
+                <img src={item.src} alt={item.alt} loading="lazy" />
+              </button>
+              {item.caption && <figcaption>{item.caption}</figcaption>}
+            </figure>
+          ))}
+          <div class="gallery-empty" hidden>Все още няма снимки в тази галерия.</div>
+        </div>
+      ))}
+
+      <div class="gallery-pagination-bar" id="gallery-pagination" hidden>
+        <div class="pagination-info">
+          <span id="page-label">Страница 1 от 1</span>
+        </div>
+        <div class="pagination-controls">
+          <button type="button" id="pg-first">Първа</button>
+          <button type="button" id="pg-prev">Предишна</button>
+          <button type="button" id="pg-next">Следваща</button>
+          <button type="button" id="pg-last">Последна</button>
+        </div>
+        <div class="pagination-jump">
+          Към страница
+          <input type="number" id="pg-jump-input" min="1" value="1" />
+          <button type="button" id="pg-jump-go">Към</button>
+        </div>
+      </div>
+
+      <div class="gallery-empty-state" id="gallery-empty-state">
+        <p>← Изберете галерия от ляво</p>
+      </div>
+    </main>
+  </div>
+
+  <dialog class="gallery-dialog" id="gallery-lightbox" aria-label="Преглед на снимка">
+    <button type="button" class="dialog-close" id="lightbox-close" aria-label="Затвори">✕</button>
+    <img src="" alt="" id="lightbox-img" />
+    <p id="lightbox-caption"></p>
+  </dialog>
+</Layout>
+
+<style>
+  [hidden] { display: none !important; }
+
+  .gallery-page {
+    display: flex;
+    gap: 0;
+    min-height: calc(100vh - 80px);
+    max-width: var(--max, 1200px);
+    margin: 0 auto;
+    padding: 40px 18px;
+  }
+
+  .gallery-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    padding-right: 32px;
+    border-right: 1px solid var(--line, #e5e5e5);
+  }
+
+  .gallery-sidebar h2 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+    margin-bottom: 16px;
+  }
+
+  .album-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .album-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    width: 100%;
+  }
+
+  .album-btn:hover {
+    background: #f5f5f5;
+    border-color: #bbb;
+  }
+
+  .album-btn.active {
+    background: var(--red, #941116);
+    color: #fff;
+    border-color: var(--red, #941116);
+  }
+
+  .album-count {
+    font-size: 0.8rem;
+    opacity: 0.6;
+  }
+
+  .album-btn.active .album-count {
+    opacity: 0.8;
+  }
+
+  .gallery-main {
+    flex: 1;
+    padding-left: 40px;
+    min-width: 0;
+  }
+
+  .gallery-main-header {
+    margin-bottom: 28px;
+  }
+
+  #gallery-album-title {
+    margin: 0 0 6px;
+    font-size: 1.8rem;
+  }
+
+  .gallery-album-desc {
+    color: #666;
+    margin: 0;
+  }
+
+  .album-images {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .gallery-thumb {
+    margin: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f0f0f0;
+    aspect-ratio: 1;
+  }
+
+  .gallery-thumb button.gallery-open {
+    all: unset;
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+
+  .gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.2s;
+  }
+
+  .gallery-thumb img:hover { opacity: 0.88; }
+
+  .gallery-thumb figcaption {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    color: #555;
+    background: #fff;
+  }
+
+  .gallery-pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .pagination-controls { display: flex; gap: 6px; }
+
+  .pagination-controls button,
+  .pagination-jump button {
+    padding: 4px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .pagination-controls button:disabled { opacity: 0.4; cursor: default; }
+
+  .pagination-jump {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pagination-jump input {
+    width: 54px;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+
+  .gallery-empty-state {
+    color: #999;
+    padding: 60px 0;
+    text-align: center;
+    font-size: 1.1rem;
+  }
+
+  .gallery-dialog {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: #000;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+
+  .gallery-dialog::backdrop { background: rgba(0,0,0,0.75); }
+
+  .gallery-dialog img {
+    display: block;
+    max-width: 85vw;
+    max-height: 80vh;
+    object-fit: contain;
+  }
+
+  .gallery-dialog p {
+    color: #eee;
+    text-align: center;
+    padding: 10px 16px;
+    margin: 0;
+    font-size: 0.9rem;
+  }
+
+  .dialog-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+
+  .dialog-close:hover { background: rgba(255,255,255,0.3); }
+
+  @media (max-width: 700px) {
+    .gallery-page { flex-direction: column; padding: 24px 12px; }
+    .gallery-sidebar {
+      width: 100%;
+      padding-right: 0;
+      border-right: none;
+      border-bottom: 1px solid var(--line, #e5e5e5);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    .album-list { flex-direction: row; flex-wrap: wrap; }
+    .album-btn { width: auto; }
+    .gallery-main { padding-left: 0; }
+    .album-images { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+<script is:inline>
+(function () {
+  const PER_PAGE = 9;
+  let currentAlbumId = null;
+  let currentPage = 1;
+
+  const titleEl = document.getElementById("gallery-album-title");
+  const paginationBar = document.getElementById("gallery-pagination");
+  const emptyState = document.getElementById("gallery-empty-state");
+  const pageLabel = document.getElementById("page-label");
+  const pgFirst = document.getElementById("pg-first");
+  const pgPrev = document.getElementById("pg-prev");
+  const pgNext = document.getElementById("pg-next");
+  const pgLast = document.getElementById("pg-last");
+  const pgJumpInput = document.getElementById("pg-jump-input");
+  const pgJumpGo = document.getElementById("pg-jump-go");
+  const lightbox = document.getElementById("gallery-lightbox");
+  const lightboxImg = document.getElementById("lightbox-img");
+  const lightboxCaption = document.getElementById("lightbox-caption");
+  const lightboxClose = document.getElementById("lightbox-close");
+
+  function getAlbumContainer(id) { return document.getElementById("album-" + id); }
+  function getAllThumbsInAlbum(id) {
+    const c = getAlbumContainer(id);
+    return c ? Array.from(c.querySelectorAll(".gallery-thumb")) : [];
+  }
+  function totalPages(id) { return Math.max(1, Math.ceil(getAllThumbsInAlbum(id).length / PER_PAGE)); }
+
+  function renderPage() {
+    if (!currentAlbumId) return;
+    const thumbs = getAllThumbsInAlbum(currentAlbumId);
+    const pages = Math.max(1, Math.ceil(thumbs.length / PER_PAGE));
+    currentPage = Math.max(1, Math.min(currentPage, pages));
+    thumbs.forEach((t, i) => { t.hidden = Math.floor(i / PER_PAGE) + 1 !== currentPage; });
+    if (pageLabel) pageLabel.textContent = "Страница " + currentPage + " от " + pages;
+    if (pgJumpInput) pgJumpInput.value = String(currentPage);
+    if (pgFirst) pgFirst.disabled = currentPage <= 1;
+    if (pgPrev) pgPrev.disabled = currentPage <= 1;
+    if (pgNext) pgNext.disabled = currentPage >= pages;
+    if (pgLast) pgLast.disabled = currentPage >= pages;
+    if (paginationBar) paginationBar.hidden = pages <= 1;
+  }
+
+  function selectAlbum(id) {
+    if (currentAlbumId && currentAlbumId !== id) {
+      const prev = getAlbumContainer(currentAlbumId);
+      if (prev) prev.hidden = true;
+    }
+    currentAlbumId = id;
+    currentPage = 1;
+    document.querySelectorAll(".album-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.albumId === id);
+    });
+    const container = getAlbumContainer(id);
+    if (container) container.hidden = false;
+    const activeBtn = document.querySelector(".album-btn[data-album-id='" + id + "']");
+    if (titleEl && activeBtn) titleEl.textContent = activeBtn.dataset.albumTitle || id;
+    const url = new URL(window.location.href);
+    url.searchParams.set("album", id);
+    url.searchParams.delete("page");
+    history.replaceState({}, "", url.toString());
+    if (emptyState) emptyState.hidden = true;
+    renderPage();
+  }
+
+  document.querySelectorAll(".album-btn").forEach((btn) => {
+    btn.addEventListener("click", () => selectAlbum(btn.dataset.albumId));
+  });
+
+  if (pgFirst) pgFirst.addEventListener("click", () => { currentPage = 1; renderPage(); });
+  if (pgPrev) pgPrev.addEventListener("click", () => { currentPage--; renderPage(); });
+  if (pgNext) pgNext.addEventListener("click", () => { currentPage++; renderPage(); });
+  if (pgLast) pgLast.addEventListener("click", () => { currentPage = currentAlbumId ? totalPages(currentAlbumId) : 1; renderPage(); });
+  if (pgJumpGo && pgJumpInput) {
+    pgJumpGo.addEventListener("click", () => {
+      const v = parseInt(pgJumpInput.value, 10);
+      if (!isNaN(v)) { currentPage = v; renderPage(); }
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".gallery-open");
+    if (!btn) return;
+    if (lightboxImg) { lightboxImg.src = btn.dataset.src || ""; lightboxImg.alt = btn.dataset.alt || ""; }
+    if (lightboxCaption) lightboxCaption.textContent = btn.dataset.caption || btn.dataset.alt || "";
+    if (lightbox) lightbox.showModal();
+  });
+
+  if (lightboxClose) lightboxClose.addEventListener("click", () => lightbox?.close());
+  if (lightbox) lightbox.addEventListener("click", (e) => { if (e.target === lightbox) lightbox.close(); });
+
+  const params = new URLSearchParams(window.location.search);
+  const initialAlbum = params.get("album");
+  const initialPage = parseInt(params.get("page") || "1", 10);
+  if (initialAlbum) {
+    const btn = document.querySelector(".album-btn[data-album-id='" + initialAlbum + "']");
+    if (btn) { currentPage = isNaN(initialPage) ? 1 : initialPage; selectAlbum(initialAlbum); return; }
+  }
+  const firstBtn = document.querySelector(".album-btn");
+  if (firstBtn) selectAlbum(firstBtn.dataset.albumId);
+})();
+</script>

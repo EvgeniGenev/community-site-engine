@@ -66,7 +66,7 @@ const maxCss = `:root { --max: ${maxWidth}px; } body { overflow-x: hidden; }`;
       <nav class="main-nav" aria-label="Main navigation">
         {navigation.items.map((item) => (
           <div class="nav-item">
-            <a href={item.href}>{item.label}</a>
+            <a href={item.href} onclick={item.href === "#" ? "event.preventDefault()" : undefined}>{item.label}</a>
             {item.children.length > 0 && (
               <div class="nav-dropdown">
                 {item.children.map((child) => <a href={child.href}>{child.label}</a>)}
@@ -100,17 +100,17 @@ const maxCss = `:root { --max: ${maxWidth}px; } body { overflow-x: hidden; }`;
           <div class="footer-social">
             <h3>Follow us on</h3>
             <div class="social-icons">
-              <a href="https://facebook.com/bhcaz" aria-label="Facebook">
+              <a href={settings.social?.find((s) => s.label.toLowerCase().includes("facebook"))?.href ?? "https://facebook.com"} aria-label="Facebook">
                 <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 2.04c-5.5 0-10 4.49-10 10.02c0 5 3.66 9.15 8.44 9.9v-7h-2.54v-2.9h2.54V9.85c0-2.51 1.49-3.89 3.77-3.89c1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.45 2.9h-2.33v7a10 10 0 0 0 8.44-9.9c0-5.53-4.5-10.02-10-10.02Z"/></svg>
               </a>
-              <a href="https://instagram.com/bhcaz" aria-label="Instagram">
+              <a href={settings.social?.find((s) => s.label.toLowerCase().includes("instagram"))?.href ?? "https://instagram.com"} aria-label="Instagram">
                 <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8A3.6 3.6 0 0 0 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6A3.6 3.6 0 0 0 16.4 4H7.6m9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8a1.25 1.25 0 0 1-1.25-1.25a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3Z"/></svg>
               </a>
             </div>
           </div>
           <div class="footer-contact">
             <h3>Contact us</h3>
-            <a href="mailto:info@bhcaz.com" class="mail-link" aria-label="Email us">
+            <a href={`mailto:${settings.contactEmail ?? "info@example.com"}`} class="mail-link" aria-label="Email us">
               <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4l-8 5l-8-5V6l8 5l8-5v2Z"/></svg>
             </a>
           </div>

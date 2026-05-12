@@ -527,6 +527,70 @@ label {
   gap: clamp(12px, 2vw, 22px);
 }
 
+/* Album-centric gallery layout */
+.galleryShell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 0;
+  min-height: 100%;
+}
+
+.albumSidebar {
+  border-right: 1px solid var(--line);
+  padding: 18px 14px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  background: rgba(255,255,255,.6);
+}
+
+.albumSidebarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.albumBtn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  text-align: left;
+  font-weight: normal;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.albumBtn:hover {
+  background: var(--paper);
+  border-color: #ccc;
+}
+
+.albumBtn.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.albumCount {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.albumEditor {
+  padding: 0 24px 24px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  overflow: auto;
+}
+
 .galleryItem {
   display: grid;
   gap: 10px;
@@ -536,6 +600,22 @@ label {
   border-radius: 20px;
   background: #fff;
 }
+
+.fileListEditor {
+  display: grid;
+  gap: 16px;
+  margin: 14px 0;
+}
+
+.fileListItem {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fffaf5;
+  display: grid;
+  gap: 8px;
+}
+
 
 .languagePicker {
   display: grid;

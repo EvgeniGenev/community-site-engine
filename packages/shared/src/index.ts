@@ -261,6 +261,28 @@ export const CtaBlockSchema = z.object({
   ...CustomCssSchema
 });
 
+export const FileItemSchema = z.object({
+  src: SafeMediaUrlSchema,
+  label: z.string().min(1),
+  description: z.string().optional(),
+  translations: z.record(
+    LocaleSchema,
+    z.object({
+      label: z.string().optional(),
+      description: z.string().optional()
+    })
+  ).optional()
+});
+export type FileItem = z.infer<typeof FileItemSchema>;
+
+export const FileListBlockSchema = z.object({
+  type: z.literal("fileList"),
+  title: z.string().optional(),
+  intro: z.string().optional(),
+  files: z.array(FileItemSchema).default([]),
+  ...CustomCssSchema
+});
+
 export const PageBlockSchema = z.discriminatedUnion("type", [
   HeroBlockSchema,
   RichTextBlockSchema,
@@ -268,7 +290,8 @@ export const PageBlockSchema = z.discriminatedUnion("type", [
   GalleryBlockSchema,
   EventListBlockSchema,
   ArticleListBlockSchema,
-  CtaBlockSchema
+  CtaBlockSchema,
+  FileListBlockSchema
 ]).and(z.object({
   layoutColumn: z.string().optional()
 }));
@@ -392,6 +415,16 @@ export type GalleryItem = z.infer<typeof GalleryItemSchema>;
 
 export const GallerySchema = z.array(GalleryItemSchema);
 export type Gallery = z.infer<typeof GallerySchema>;
+
+export const GalleryAlbumSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  status: PageStatusSchema.default("published"),
+  coverImage: SafeMediaUrlSchema.optional(),
+  items: z.array(GalleryItemSchema).default([])
+});
+export type GalleryAlbum = z.infer<typeof GalleryAlbumSchema>;
 
 export const UserSchema = z.object({
   id: z.string().min(1),

@@ -123,6 +123,7 @@ function truncate(text: string, max = 120) {
 
 const galleryScripts: string[] = [];
 const eventScripts: string[] = [];
+const articleScripts: string[] = [];
 ---
 <div class:list={["page-layout", { "page-layout--single": !hasMultiColumnLayout }]} data-columns={activeLayout.columns.length} style={pageGridStyle}>
 {blocks.map((block) => {
@@ -266,20 +267,39 @@ const eventScripts: string[] = [];
 
   if (block.type === "articleList") {
     const selectedArticles = block.articleIds.length ? articles.filter((article) => block.articleIds.includes(article.id)) : articles;
+    if (selectedArticles.length > 0) articleScripts.push("loaded");
     return (
-      <section class="section" style={blockStyle(block)}>
+      <section class="section article-list-block" style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         {block.intro && <p class="section-intro">{block.intro}</p>}
-        <div class="card-grid">
-          {selectedArticles.map((article) => (
-            <article class="card article">
-              {article.featuredImage && <img src={article.featuredImage.src} alt={article.featuredImage.alt} />}
-              <p class="eyebrow">{article.category} · {article.date}</p>
-              <h3>{article.title}</h3>
-              <p>{article.excerpt}</p>
-            </article>
-          ))}
+        <div class="article-list-feed" data-article-feed>
+          {selectedArticles.map((article, index) => {
+            const href = locale === "en" ? `/news-articles/${article.slug}/` : `/${locale}/novini-i-statii/${article.slug}/`;
+            const isMatch = index < 3;
+            return (
+              <article class="card article article--horizontal" data-article-page={Math.floor(index / 3)} hidden={!isMatch} style={`display:${isMatch ? "flex" : "none"};gap:24px;align-items:flex-start;margin-bottom:24px;text-align:left;`}>
+                {article.featuredImage?.src && (
+                  <div class="article-img-wrapper" style="flex:0 0 160px;max-width:160px;">
+                    <img src={article.featuredImage.src} alt={article.featuredImage.alt} loading="lazy" style="width:100%;height:120px;object-fit:cover;border-radius:12px;" />
+                  </div>
+                )}
+                <div class="article-content" style="flex:1;min-width:0;">
+                  <p class="eyebrow" style="margin-bottom:4px;">{article.category} · {article.date}</p>
+                  <h3 style="margin:0 0 8px;"><a href={href} style="color:inherit;text-decoration:none;">{article.title}</a></h3>
+                  <p class="snippet" style="margin:0 0 12px;color:var(--muted);font-size:15px;line-height:1.5;">{article.excerpt}</p>
+                  <a href={href} class="read-more-link" style="font-weight:600;font-size:15px;">{locale === "en" ? "Read more →" : "Прочети повече →"}</a>
+                </div>
+              </article>
+            );
+          })}
         </div>
+        {selectedArticles.length > 3 && (
+          <div class="pager-controls" data-article-pager data-total-pages={Math.ceil(selectedArticles.length / 3)} style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:32px;">
+            <button type="button" class="button secondary" data-pager-prev disabled style="padding:8px 16px;">← {locale === "en" ? "Previous" : "Предишна"}</button>
+            <span class="pager-status" style="font-size:15px;font-weight:500;"><span data-pager-current>1</span> / {Math.ceil(selectedArticles.length / 3)}</span>
+            <button type="button" class="button secondary" data-pager-next style="padding:8px 16px;">{locale === "en" ? "Next" : "Следваща"} →</button>
+          </div>
+        )}
       </section>
     );
   }
@@ -295,6 +315,46 @@ const eventScripts: string[] = [];
       </section>
     );
   }
+
+  if (block.type === "fileList") {
+    const localizeFileItem = (item: any) => {
+      if (locale === "en") return item;
+      const t = item.translations?.[locale];
+      return {
+        ...item,
+        label: t?.label?.trim() ? t.label : item.label,
+        description: t?.description?.trim() ? t.description : item.description
+      };
+    };
+    return (
+      <section class="section file-list-block" style={blockStyle(block)}>
+        {block.title && <h2 class="file-list-heading">{block.title}</h2>}
+        {block.intro && <p class="section-intro">{block.intro}</p>}
+        <ul class="file-list">
+          {block.files.map((rawItem) => {
+            const item = localizeFileItem(rawItem);
+            const ext = item.src.split(".").pop()?.toUpperCase() ?? "FILE";
+            return (
+              <li class="file-item">
+                <a class="file-link" href={item.src} target="_blank" rel="noopener noreferrer" download>
+                  <span class="file-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </span>
+                  <span class="file-label">{item.label}</span>
+                  <span class="file-ext">{ext}</span>
+                </a>
+                {item.description && <p class="file-description">{item.description}</p>}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    );
+  }
+
 })}
 </div>
 
@@ -434,6 +494,45 @@ const eventScripts: string[] = [];
       });
       renderCalendar();
       filter(null);
+    });
+  </script>
+)}
+
+{articleScripts.length > 0 && (
+  <script is:inline>
+    document.querySelectorAll("[data-article-pager]").forEach((pager) => {
+      const section = pager.closest(".article-list-block") || document;
+      const cards = section.querySelectorAll("[data-article-page]");
+      const prevBtn = pager.querySelector("[data-pager-prev]");
+      const nextBtn = pager.querySelector("[data-pager-next]");
+      const currentSpan = pager.querySelector("[data-pager-current]");
+      const totalPages = Number(pager.dataset.totalPages || 1);
+      let currentPage = 0;
+
+      function update() {
+        cards.forEach((card) => {
+          const match = Number(card.dataset.articlePage) === currentPage;
+          card.hidden = !match;
+          card.style.display = match ? "flex" : "none";
+        });
+        if (currentSpan) currentSpan.textContent = String(currentPage + 1);
+        if (prevBtn) prevBtn.disabled = currentPage === 0;
+        if (nextBtn) nextBtn.disabled = currentPage >= totalPages - 1;
+      }
+
+      prevBtn?.addEventListener("click", () => {
+        if (currentPage > 0) {
+          currentPage -= 1;
+          update();
+        }
+      });
+
+      nextBtn?.addEventListener("click", () => {
+        if (currentPage < totalPages - 1) {
+          currentPage += 1;
+          update();
+        }
+      });
     });
   </script>
 )}
