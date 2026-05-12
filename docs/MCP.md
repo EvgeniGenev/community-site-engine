@@ -1,6 +1,6 @@
 # Community Site Engine MCP Server
 
-The MCP server lets an LLM agent control the CMS through the same authenticated CMS API used by the admin UI.
+The MCP server lets an LLM agent control the CMS through the same authenticated CMS API used by the admin UI. For host integration configs and client staging directives, consult the [Agent Instructions Blueprint](AGENT_INSTRUCTIONS.md).
 
 ## Tools
 
@@ -26,6 +26,8 @@ The MCP server lets an LLM agent control the CMS through the same authenticated 
 - `cms_delete_user`: delete a Cognito/local user.
 - `cms_reset_user_password`: reset a Cognito password as temporary/permanent, or reset a local dev token.
 - `cms_trigger_build`: start the configured AWS CodeBuild site build/deploy.
+- `cms_backup`: download a full site content and media backup as a ZIP archive.
+- `cms_restore`: restore all site content from a backup ZIP archive. Overwrites current state.
 - `cms_me`: return the authenticated CMS user and role.
 
 The MCP server intentionally does not bypass validation or storage rules. It calls the CMS API.
