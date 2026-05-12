@@ -142,6 +142,19 @@ Cognito sends that user an invitation email with a temporary password. On first 
 
 To add more users later, sign in to Admin and use the Users screen.
 
+## Production Security & Authentication
+
+When transitioning from local development to production with AWS Cognito, the CMS API enforces a rigorous security architecture:
+
+1. **Strict Disablement of Dev Tokens:** Setting `CMS_ALLOW_DEV_TOKENS=false` in the backend API deployment configuration guarantees that fallback credentials (e.g., `dev-admin-token`) are completely rejected.
+2. **Cognito JWT Verification Engine:** The API cryptographically authenticates RS256 token signatures against dynamically fetched AWS Cognito public JWKS sets, validating token usage, audience alignment, and expiry timestamps.
+3. **Role Mapping via Custom Attributes:** Users are assigned authorization levels via the `custom:role` string attribute (`admin`, `designer`, or `contributor`). Self-registration or arbitrary attribute updates are strictly forbidden to prevent privilege escalation.
+4. **Route Authorization Matrix Middleware:** Every protected endpoint validates access using a strict role check matrix before modifying disk/S3 storage or triggering CodeBuild:
+   - **Admin:** Unlimited control across all API routes.
+   - **Designer:** Full structural and content access (`read`, `writeContent`, `writeStructure`, `delete`, `media`), blocked from global configuration (`settings`).
+   - **Contributor:** Dedicated content editing capabilities (`read`, `writeContent`, `delete`, `media`), blocked from editing layout components (`writeStructure`) or site settings.
+5. **Origin Restrictions:** Overriding permissive local CORS headers by explicitly setting `ADMIN_ALLOWED_ORIGINS` to the authenticated production Admin SPA domain blocks malicious cross-origin requests.
+
 ## Ongoing Code Changes
 
 For code changes:

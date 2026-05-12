@@ -554,8 +554,8 @@ async function restoreSiteBackup(zipBuffer: Buffer) {
 function stripTagsPreservingLineBreaks(value: string) {
   // Convert block-level tags to newlines before stripping
   const withBreaks = value
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style\s*>/gi, " ")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<\/div>/gi, "\n")
@@ -588,7 +588,7 @@ function deepFind(obj: unknown, key: string, maxDepth = 8): string | number | un
 function embeddedJsonBlobs(html: string): unknown[] {
   const blobs: unknown[] = [];
   // Pattern: some_var = { ... } or some_var = [ ... ] as a JS assignment in a script tag
-  const scriptPattern = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  const scriptPattern = /<script[^>]*>([\s\S]*?)<\/script\s*>/gi;
   for (const scriptMatch of html.matchAll(scriptPattern)) {
     const script = scriptMatch[1] ?? "";
     // Look for large JSON objects assigned to variables
@@ -882,7 +882,7 @@ function decodeHtml(value: string) {
 }
 
 function stripTags(value: string) {
-  return decodeHtml(value.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " "));
+  return decodeHtml(value.replace(/<script[\s\S]*?<\/script\s*>/gi, " ").replace(/<style[\s\S]*?<\/style\s*>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " "));
 }
 
 function metaContent(html: string, key: string) {
@@ -899,7 +899,7 @@ function metaContent(html: string, key: string) {
 }
 
 function titleFromHtml(html: string) {
-  const title = metaContent(html, "og:title") ?? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+  const title = metaContent(html, "og:title") ?? html.match(/<title[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1];
   return title ? stripTags(title).replace(/\s*\|\s*Facebook\s*$/i, "").replace(/\s+public group\s*$/i, "").trim() : undefined;
 }
 
