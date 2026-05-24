@@ -9,9 +9,10 @@ interface Props {
   galleryItems: MediaRef[];
   eventTimeZone: string;
   locale?: string;
+  contactFormEnabled?: boolean;
 }
 
-const { blocks, layout, events, articles, galleryItems, eventTimeZone, locale = "en" } = Astro.props;
+const { blocks, layout, events, articles, galleryItems, eventTimeZone, locale = "en", contactFormEnabled = false } = Astro.props;
 const activeLayout = layout ?? { columns: [{ id: "main", label: "Main", width: 100 }] };
 const hasMultiColumnLayout = activeLayout.columns.length > 1;
 const columnIds = new Set(activeLayout.columns.map((column) => column.id));
@@ -194,6 +195,8 @@ const articleScripts: string[] = [];
         <div class="gallery-pagination" aria-label="Gallery pagination"></div>
         <dialog class="gallery-dialog" aria-label="Image preview">
           <button type="button" class="dialog-close" aria-label="Close image preview">Close</button>
+          <button type="button" class="lightbox-nav-btn lightbox-prev" aria-label="Previous image">‹</button>
+          <button type="button" class="lightbox-nav-btn lightbox-next" aria-label="Next image">›</button>
           <img src="" alt="" />
           <p></p>
         </dialog>
@@ -202,14 +205,34 @@ const articleScripts: string[] = [];
   }
 
   if (block.type === "eventList") {
-    const selectedEvents = (block.eventIds.length ? events.filter((event) => block.eventIds.includes(event.id)) : events)
-      .slice()
-      .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+    let selectedEvents = block.eventIds.length ? events.filter((event) => block.eventIds.includes(event.id)) : events;
+    
+    if (block.sort === "asc") {
+      const now = Date.now();
+      selectedEvents = selectedEvents
+        .filter(event => new Date(event.startsAt).getTime() >= now)
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    } else {
+      selectedEvents = selectedEvents.slice().sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+    }
+
+    if (block.limit) {
+      selectedEvents = selectedEvents.slice(0, block.limit);
+    }
+
     const calendarEvents = selectedEvents.map((event) => ({ ...event, dateKey: eventDateKey(event.startsAt) }));
-    const eventsId = `events-${eventScripts.length}`;
-    eventScripts.push(eventsId);
+    let rootProps = {};
+    if (block.showCalendar !== false) {
+      const eventsId = `events-${eventScripts.length}`;
+      eventScripts.push(eventsId);
+      rootProps = {
+        "data-events-root": eventsId,
+        "data-events": JSON.stringify(calendarEvents),
+        "data-time-zone": eventTimeZone
+      };
+    }
     return (
-      <section class="section events-calendar-shell" data-events-root={eventsId} data-events={JSON.stringify(calendarEvents)} data-time-zone={eventTimeZone} style={blockStyle(block)}>
+      <section class="section events-calendar-shell" {...rootProps} style={blockStyle(block)}>
         {block.title && <h2>{block.title}</h2>}
         {block.intro && <p class="section-intro">{block.intro}</p>}
         {block.showCalendar !== false ? (
@@ -243,7 +266,7 @@ const articleScripts: string[] = [];
             </div>
           </div>
         ) : (
-          <div class="event-list" data-event-list>
+          <div class={block.columns === 3 ? "event-grid" : "event-list"} data-event-list>
           {selectedEvents.map((event) => (
             <article class="event-card" data-event-card data-date={eventDateKey(event.startsAt)}>
               <div class="date-box">
@@ -355,6 +378,89 @@ const articleScripts: string[] = [];
     );
   }
 
+  if (block.type === "contactForm") {
+    const formId = `contact-form-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (!contactFormEnabled) {
+      return (
+        <section class="section contact-form-block" style={blockStyle(block)}>
+          {block.title && <h2 class="contact-form-heading">{block.title}</h2>}
+          <div class="contact-form-unavailable">
+            <p>The contact form is temporarily unavailable. Please email us directly at <a href="mailto:contact@bhcaz.org">contact@bhcaz.org</a>.</p>
+          </div>
+        </section>
+      );
+    }
+
+    return (
+      <section class="section contact-form-block" style={blockStyle(block)}>
+        {block.title && <h2 class="contact-form-heading">{block.title}</h2>}
+        {block.intro && <p class="section-intro">{block.intro}</p>}
+        <form id={formId} class="contact-form" novalidate>
+          <label class="contact-field">
+            <span>{block.nameLabel ?? "Your Name"}</span>
+            <input type="text" name="name" required maxlength="200" autocomplete="name" placeholder="Full name" />
+          </label>
+          <label class="contact-field">
+            <span>{block.emailLabel ?? "Your Email"}</span>
+            <input type="email" name="email" required maxlength="320" autocomplete="email" placeholder="your@email.com" />
+          </label>
+          <label class="contact-field">
+            <span>{block.subjectLabel ?? "Subject"}</span>
+            <input type="text" name="subject" required maxlength="500" placeholder="How can we help?" />
+          </label>
+          <label class="contact-field">
+            <span>{block.messageLabel ?? "Message"}</span>
+            <textarea name="message" required maxlength="4000" rows="6" placeholder="Your message…"></textarea>
+          </label>
+          <div class="contact-form-footer">
+            <button type="submit" class="button primary" id={`${formId}-submit`}>{block.submitLabel ?? "Send Message"}</button>
+            <p class="contact-form-status" id={`${formId}-status`} aria-live="polite"></p>
+          </div>
+        </form>
+        <script is:inline define:vars={{ formId, successMessage: block.successMessage ?? "Thank you! Your message has been sent." }}>
+          (function () {
+            var form = document.getElementById(formId);
+            var statusEl = document.getElementById(formId + "-status");
+            var submitBtn = document.getElementById(formId + "-submit");
+            if (!form) return;
+            form.addEventListener("submit", async function (e) {
+              e.preventDefault();
+              var data = Object.fromEntries(new FormData(form).entries());
+              statusEl.textContent = "";
+              statusEl.className = "contact-form-status";
+              submitBtn.disabled = true;
+              submitBtn.textContent = "Sending…";
+              try {
+                var apiUrl = (document.querySelector("meta[name='cms-api-url']") || {}).content || "http://localhost:8787";
+                var res = await fetch(apiUrl + "/contact", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(data)
+                });
+                var json = await res.json();
+                if (json.ok) {
+                  form.reset();
+                  statusEl.textContent = successMessage;
+                  statusEl.className = "contact-form-status success";
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = "Send Message";
+                } else {
+                  throw new Error(json.message || "Something went wrong.");
+                }
+              } catch (err) {
+                statusEl.textContent = err.message || "Failed to send. Please try again later.";
+                statusEl.className = "contact-form-status error";
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Send Message";
+              }
+            });
+          })();
+        </script>
+      </section>
+    );
+  }
+
 })}
 </div>
 
@@ -367,7 +473,11 @@ const articleScripts: string[] = [];
       const dialogImage = dialog?.querySelector("img");
       const dialogCaption = dialog?.querySelector("p");
       const close = dialog?.querySelector(".dialog-close");
+      const prev = dialog?.querySelector(".lightbox-prev");
+      const next = dialog?.querySelector(".lightbox-next");
       let page = 1;
+      let lightboxIndex = -1;
+      let openButtons = Array.from(root.querySelectorAll(".gallery-open"));
       const pages = Math.max(1, Math.ceil(items.length / 9));
 
       function render() {
@@ -390,14 +500,47 @@ const articleScripts: string[] = [];
         }
       }
 
-      root.querySelectorAll(".gallery-open").forEach((button) => {
-        button.addEventListener("click", () => {
-          if (!dialog || !dialogImage || !dialogCaption) return;
+      function updateLightboxControls() {
+        if (prev) {
+          prev.disabled = lightboxIndex <= 0;
+          prev.hidden = openButtons.length <= 1;
+        }
+        if (next) {
+          next.disabled = lightboxIndex >= openButtons.length - 1;
+          next.hidden = openButtons.length <= 1;
+        }
+      }
+
+      function openLightbox(index) {
+        if (index < 0 || index >= openButtons.length) return;
+        lightboxIndex = index;
+        const button = openButtons[index];
+        if (dialogImage) {
           dialogImage.src = button.dataset.src || "";
           dialogImage.alt = button.dataset.alt || "";
+        }
+        if (dialogCaption) {
           dialogCaption.textContent = button.dataset.caption || button.dataset.alt || "";
+        }
+        updateLightboxControls();
+      }
+
+      openButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          if (!dialog) return;
+          openLightbox(openButtons.indexOf(button));
           dialog.showModal();
         });
+      });
+
+      prev?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openLightbox(lightboxIndex - 1);
+      });
+      
+      next?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openLightbox(lightboxIndex + 1);
       });
 
       close?.addEventListener("click", () => dialog?.close());
@@ -441,14 +584,33 @@ const articleScripts: string[] = [];
         return `${year}-${month}-${day}`;
       }
 
-      function filter(date) {
+      function filterByMonth(year, month) {
+        const prefix = `${year}-${String(month + 1).padStart(2, "0")}-`;
         let visible = 0;
         cards.forEach((card) => {
-          const match = !date || card.dataset.date === date;
-          card.hidden = !match;
+          const match = card.dataset.date?.startsWith(prefix);
+          card.style.display = match ? "" : "none";
           if (match) visible += 1;
         });
-        if (empty) empty.hidden = visible > 0;
+        if (empty) empty.style.display = visible > 0 ? "none" : "";
+      }
+
+      function filter(dateKey) {
+        // Check if this date has any events
+        const hasEvents = eventDates.has(dateKey);
+        if (hasEvents) {
+          // Show only events on this specific date
+          let visible = 0;
+          cards.forEach((card) => {
+            const match = card.dataset.date === dateKey;
+            card.style.display = match ? "" : "none";
+            if (match) visible += 1;
+          });
+          if (empty) empty.style.display = visible > 0 ? "none" : "";
+        } else {
+          // No events on this date — fall back to showing the whole month
+          filterByMonth(cursor.getFullYear(), cursor.getMonth());
+        }
       }
 
       function renderCalendar() {
@@ -482,18 +644,20 @@ const articleScripts: string[] = [];
       root.querySelector("[data-calendar-prev]")?.addEventListener("click", () => {
         cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
         renderCalendar();
+        filterByMonth(cursor.getFullYear(), cursor.getMonth());
       });
       root.querySelector("[data-calendar-next]")?.addEventListener("click", () => {
         cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
         renderCalendar();
+        filterByMonth(cursor.getFullYear(), cursor.getMonth());
       });
       root.querySelector("[data-calendar-today]")?.addEventListener("click", () => {
         cursor = monthFromKey(todayKey);
         renderCalendar();
-        filter(null);
+        filterByMonth(cursor.getFullYear(), cursor.getMonth());
       });
       renderCalendar();
-      filter(null);
+      filterByMonth(cursor.getFullYear(), cursor.getMonth());
     });
   </script>
 )}

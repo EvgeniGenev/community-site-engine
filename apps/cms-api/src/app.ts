@@ -1176,6 +1176,8 @@ async function writeLocalizedObject(collection: "pages" | "articles", key: strin
   return { key, data, created };
 }
 
+import { sendContactEmail } from "./contact.js";
+
 app.use("*", cors({
   origin: allowedCorsOrigin,
   allowHeaders: ["Authorization", "Content-Type"],
@@ -1190,6 +1192,71 @@ app.use("*", async (c, next) => {
   await next();
 });
 
+const ContactFormSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email().max(320),
+  subject: z.string().min(1).max(500),
+  message: z.string().min(1).max(4000)
+});
+
+// Public route — no auth token required. CORS still limits callers to allowed origins.
+app.post("/contact", async (c) => {
+  const contentType = c.req.header("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return c.json({ ok: false, message: "Content-Type must be application/json" }, 415);
+  }
+  const rawBody = await c.req.text();
+  if (rawBody.length > 10_000) {
+    return c.json({ ok: false, message: "Request body too large" }, 413);
+  }
+  let parsed: { name: string; email: string; subject: string; message: string };
+  try {
+    parsed = ContactFormSchema.parse(JSON.parse(rawBody));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return c.json({ ok: false, message: "Invalid form data", issues: error.issues }, 400);
+    }
+    return c.json({ ok: false, message: "Invalid JSON body" }, 400);
+  }
+
+  // Read the contact email and enabled flag from site settings at request time
+  let toAddress: string;
+  let formEnabled: boolean;
+  try {
+    const settingsRaw = await readJson(storage, "settings/site.json");
+    const siteSettings = SiteSettingsSchema.parse(settingsRaw);
+    toAddress = siteSettings.contactEmail;
+    formEnabled = siteSettings.contactFormEnabled ?? false;
+  } catch {
+    return c.json({ ok: false, message: "Contact address is not configured" }, 503);
+  }
+
+  if (!formEnabled) {
+    return c.json({ ok: false, message: "Contact form is currently disabled. Please try again later." }, 503);
+  }
+
+  const fromAddress = config.sesFromAddress || toAddress;
+
+  // Truncate fields to safe email lengths
+  const safeName = parsed.name.slice(0, 200);
+  const safeSubject = parsed.subject.slice(0, 200);
+  const safeMessage = parsed.message.slice(0, 3000);
+
+  try {
+    await sendContactEmail({
+      toAddress,
+      fromAddress,
+      replyToAddress: parsed.email,
+      subject: `[BHCAZ Contact Form] ${safeSubject}`,
+      name: safeName,
+      message: safeMessage
+    });
+    return c.json({ ok: true });
+  } catch (error) {
+    console.error("[contact] SES send failed:", error);
+    return c.json({ ok: false, message: "Failed to send message. Please try again later." }, 502);
+  }
+});
 
 app.use("/api/*", async (c, next) => {
   const user = await authenticate(storage, c.req.header("authorization"));

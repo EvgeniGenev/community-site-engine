@@ -472,6 +472,10 @@ Resources:
                 Action:
                   - codebuild:StartBuild
                 Resource: !Sub arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${SiteName}-build-${AWS::Region}-${AWS::AccountId}
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                Resource: "*"
 
   ApiLambda:
     Type: AWS::Lambda::Function
@@ -502,6 +506,9 @@ Resources:
           MAX_MEDIA_BYTES: "10485760"
           CODEBUILD_PROJECT_NAME: !Sub ${SiteName}-build-${AWS::Region}-${AWS::AccountId}
           CODEBUILD_QUEUED_TIMEOUT_MINUTES: "30"
+          SES_ENABLED: "true"
+          SES_REGION: !Ref AWS::Region
+          SES_FROM_ADDRESS: !Ref AdminEmail
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
@@ -822,7 +829,7 @@ Resources:
                 - npm run seed:media
                 - VITE_CMS_API_URL="$CMS_API_ENDPOINT" VITE_COGNITO_DOMAIN="$COGNITO_DOMAIN" VITE_COGNITO_CLIENT_ID="$COGNITO_CLIENT_ID" VITE_COGNITO_REDIRECT_URI="$ADMIN_ORIGIN" npm --workspace apps/cms-admin run build
                 - aws s3 sync apps/cms-admin/dist "s3://$ADMIN_SITE_BUCKET/" --delete
-                - npm run build:site
+                - PUBLIC_CMS_API_URL="$CMS_API_ENDPOINT" npm run build:site
                 - aws s3 sync apps/site/dist "s3://$PUBLIC_SITE_BUCKET/" --delete
             post_build:
               commands:

@@ -170,18 +170,28 @@ export const FontIdSchema = z.enum(FONT_OPTIONS.map((font) => font.id) as [FontI
 
 export const FontSettingsSchema = z.object({
   default: FontIdSchema.default("universal-serif"),
+  defaultSize: z.string().optional(),
   page: FontIdSchema.optional(),
+  pageSize: z.string().optional(),
   headings: FontIdSchema.optional(),
+  headingsSize: z.string().optional(),
   navigation: FontIdSchema.optional(),
+  navigationSize: z.string().optional(),
   event: FontIdSchema.optional(),
+  eventSize: z.string().optional(),
   article: FontIdSchema.optional(),
+  articleSize: z.string().optional(),
   gallery: FontIdSchema.optional(),
+  gallerySize: z.string().optional(),
   card: FontIdSchema.optional(),
-  cta: FontIdSchema.optional()
+  cardSize: z.string().optional(),
+  cta: FontIdSchema.optional(),
+  ctaSize: z.string().optional()
 });
 
 function validateFontSettings(settings: FontSettings, languageCodes: string[], ctx: z.RefinementCtx) {
   for (const [key, value] of Object.entries(settings)) {
+    if (key.endsWith('Size')) continue;
     if (value && !fontSupportsLanguages(value, languageCodes)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -242,6 +252,9 @@ export const EventListBlockSchema = z.object({
   intro: z.string().optional(),
   eventIds: z.array(z.string()).default([]),
   showCalendar: z.boolean().default(true).optional(),
+  limit: z.number().optional(),
+  sort: z.enum(["desc", "asc"]).default("desc").optional(),
+  columns: z.number().optional(),
   ...CustomCssSchema
 });
 
@@ -283,6 +296,20 @@ export const FileListBlockSchema = z.object({
   ...CustomCssSchema
 });
 
+export const ContactFormBlockSchema = z.object({
+  type: z.literal("contactForm"),
+  title: z.string().optional(),
+  intro: z.string().optional(),
+  submitLabel: z.string().optional(),
+  successMessage: z.string().optional(),
+  nameLabel: z.string().optional(),
+  emailLabel: z.string().optional(),
+  subjectLabel: z.string().optional(),
+  messageLabel: z.string().optional(),
+  ...CustomCssSchema
+});
+export type ContactFormBlock = z.infer<typeof ContactFormBlockSchema>;
+
 export const PageBlockSchema = z.discriminatedUnion("type", [
   HeroBlockSchema,
   RichTextBlockSchema,
@@ -291,7 +318,8 @@ export const PageBlockSchema = z.discriminatedUnion("type", [
   EventListBlockSchema,
   ArticleListBlockSchema,
   CtaBlockSchema,
-  FileListBlockSchema
+  FileListBlockSchema,
+  ContactFormBlockSchema
 ]).and(z.object({
   layoutColumn: z.string().optional()
 }));
@@ -321,6 +349,7 @@ export const PageSchema = z.object({
   slug: z.string(),
   translationKey: z.string().min(1),
   seo: SeoSchema,
+  miniHero: z.string().optional(),
   layout: PageLayoutSchema,
   blocks: z.array(PageBlockSchema)
 });
@@ -391,6 +420,7 @@ export const SiteSettingsSchema = z.object({
   tagline: z.string().default("Community content, simple editing, and static publishing."),
   description: z.string().min(1),
   siteIcon: MediaRefSchema.optional(),
+  brandLogo: MediaRefSchema.optional(),
   defaultLocale: LocaleSchema,
   supportedLanguages: z.array(LanguageSchema).default([
     { code: "en", name: "English", nativeName: "English" }
@@ -400,7 +430,12 @@ export const SiteSettingsSchema = z.object({
   headerMaxWidth: z.number().int().min(600).max(2400).optional(),
   fonts: FontSettingsSchema.default({ default: "universal-serif" }),
   contactEmail: z.string().email(),
-  social: z.array(LinkSchema).default([])
+  contactFormEnabled: z.boolean().default(false),
+  social: z.array(LinkSchema).default([]),
+  backgroundMode: z.enum(["gradient", "solid"]).default("gradient").optional(),
+  backgroundColor: z.string().default("#ffffff").optional(),
+  navBackgroundMode: z.enum(["transparent", "gradient", "solid"]).default("transparent").optional(),
+  navBackgroundColor: z.string().default("#ffffff").optional()
 }).superRefine((settings, ctx) => {
   validateFontSettings(settings.fonts, settings.supportedLanguages.map((language) => language.code), ctx);
 });

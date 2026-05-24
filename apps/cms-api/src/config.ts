@@ -17,5 +17,8 @@ export const config = {
     .filter(Boolean),
   maxMediaBytes: Number(process.env.MAX_MEDIA_BYTES ?? 10 * 1024 * 1024),
   codeBuildProjectName: process.env.CODEBUILD_PROJECT_NAME,
-  codeBuildQueuedTimeoutMinutes: Number(process.env.CODEBUILD_QUEUED_TIMEOUT_MINUTES ?? "30")
+  codeBuildQueuedTimeoutMinutes: Number(process.env.CODEBUILD_QUEUED_TIMEOUT_MINUTES ?? "30"),
+  sesEnabled: process.env.SES_ENABLED !== "false",
+  sesRegion: process.env.SES_REGION ?? process.env.COGNITO_REGION ?? "us-east-1",
+  sesFromAddress: process.env.SES_FROM_ADDRESS ?? ""
 };

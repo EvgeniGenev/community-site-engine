@@ -28,6 +28,12 @@ export const FONT_OPTIONS = [
     label: "UI Monospace",
     stack: "\"Cascadia Code\", \"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace",
     languageCodes: ["en", "bg", "ru", "uk", "sr", "mk", "be", "ro", "pl", "cs", "sk", "sl", "hr", "hu", "de", "fr", "es", "it", "pt", "nl", "sv", "da", "fi", "no", "lt", "lv", "et", "tr", "sq", "mt"]
+  },
+  {
+    id: "sans-serif",
+    label: "Sans Serif",
+    stack: "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+    languageCodes: "all"
   }
 ] as const;
 
@@ -35,14 +41,23 @@ export type FontId = (typeof FONT_OPTIONS)[number]["id"];
 
 export interface FontSettings {
   default: FontId;
+  defaultSize?: string | undefined;
   page?: FontId | undefined;
+  pageSize?: string | undefined;
   headings?: FontId | undefined;
+  headingsSize?: string | undefined;
   navigation?: FontId | undefined;
+  navigationSize?: string | undefined;
   event?: FontId | undefined;
+  eventSize?: string | undefined;
   article?: FontId | undefined;
+  articleSize?: string | undefined;
   gallery?: FontId | undefined;
+  gallerySize?: string | undefined;
   card?: FontId | undefined;
+  cardSize?: string | undefined;
   cta?: FontId | undefined;
+  ctaSize?: string | undefined;
 }
 
 export function fontSupportsLanguages(fontId: string, languageCodes: readonly string[]) {

@@ -41,13 +41,15 @@ img {
   top: 0;
   z-index: 10;
   display: grid;
+  width: min(var(--max), calc(100% - 36px));
+  margin: 0 auto;
   grid-template-columns: minmax(210px, 1fr) auto auto;
   gap: 20px;
   align-items: center;
   padding: 16px clamp(18px, 4vw, 48px);
-  border-bottom: 1px solid rgba(35, 31, 32, .08);
   background: rgba(255, 250, 242, .92);
   backdrop-filter: blur(18px);
+  margin-bottom: 32px;
 }
 
 .brand {
@@ -55,6 +57,12 @@ img {
   gap: 12px;
   align-items: center;
   text-decoration: none;
+}
+
+.brand-logo {
+  max-width: 100%;
+  max-height: 110px;
+  object-fit: contain;
 }
 
 .brand-mark {
@@ -81,6 +89,8 @@ img {
   display: flex;
   gap: 4px;
   align-items: center;
+  border-bottom: 1px solid rgba(35, 31, 32, .12);
+  padding-bottom: 8px;
 }
 
 .nav-item {
@@ -175,13 +185,17 @@ img {
   grid-template-columns: var(--page-columns);
   gap: clamp(22px, 3vw, 42px);
   align-items: start;
-  padding: clamp(42px, 6vw, 82px) 0;
+  padding: 0 0 clamp(42px, 6vw, 82px) 0;
 }
 
 .page-layout:not(.page-layout--single) > .section {
   width: 100%;
   margin: 0;
   padding: 0;
+}
+
+.page-layout--single > .layout-column > .section:first-child {
+  padding-top: 0;
 }
 
 .hero {
@@ -434,6 +448,13 @@ h3 {
   margin-top: 24px;
 }
 
+.event-grid {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
 .events-workspace {
   display: grid;
   grid-template-columns: minmax(260px, 40%) minmax(0, 60%);
@@ -570,12 +591,20 @@ h3 {
 }
 
 .site-footer {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 24px;
+  width: min(var(--max), calc(100% - 36px));
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
   padding: 36px clamp(18px, 4vw, 48px);
   border-top: 1px solid var(--line);
   color: var(--muted);
+}
+
+.footer-container {
+  display: flex;
+  gap: clamp(40px, 8vw, 80px);
+  align-items: center;
+  text-align: center;
 }
 
 .site-footer a {
@@ -628,6 +657,7 @@ h3 {
   .page-layout:not(.page-layout--single) {
     width: min(100% - 24px, var(--max));
     grid-template-columns: 1fr;
+    padding: 0 0 40px 0;
   }
 
   .page-layout:not(.page-layout--single) > .section {
@@ -659,9 +689,13 @@ h3 {
     font-size: clamp(38px, 14vw, 62px);
   }
 
-  .event-card,
-  .site-footer {
+  .event-card {
     grid-template-columns: 1fr;
+  }
+
+  .footer-container {
+    flex-direction: column;
+    gap: 32px;
   }
 
   .date-box {

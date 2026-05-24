@@ -20,6 +20,13 @@ const articles = await getArticles(page.locale);
 const galleryItems = await getGallery(page.locale);
 ---
 <Layout page={page} settings={settings} navigation={navigation}>
-  <Blocks blocks={page.blocks} layout={page.layout} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} locale={page.locale} />
+  <div class="mini-hero section">
+    <div class="mini-hero-left">
+      {page.miniHero || page.title}
+    </div>
+    <div class="mini-hero-right"></div>
+  </div>
+  <Blocks blocks={page.blocks} layout={page.layout} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} locale={page.locale} contactFormEnabled={settings.contactFormEnabled ?? false} />
 </Layout>
 <!-- hot reload trigger 4 -->
+

@@ -231,7 +231,7 @@ The deployed instance of this engine serves the BHCAZ website:
 - **Site name**: Bulgarian Heritage Center of Arizona
 - **Languages**: English (`en`), Bulgarian (`bg`)
 - **Event timezone**: `America/Phoenix`
-- **Contact**: info@bhcaz.org
+- **Contact**: contact@bhcaz.org
 - **Social**: Facebook (https://www.facebook.com/profile.php?id=61579826025122)
 - **Content pages** (English): home, about-us, mission-and-values, events, gallery, news-articles, projects, volunteers, sponsors, advertising-with-bhcaz, contact-us, donations
 

@@ -42,10 +42,7 @@ const galleryPage = {
     </aside>
 
     <main class="gallery-main" id="gallery-main">
-      <header class="gallery-main-header">
-        <h1 id="gallery-album-title">Select a gallery</h1>
-        <p id="gallery-album-desc" class="gallery-album-desc"></p>
-      </header>
+
 
       <!-- All albums embedded as data, rendered by JS -->
       {albums.map((album) => (
@@ -102,6 +99,8 @@ const galleryPage = {
   <!-- Lightbox dialog -->
   <dialog class="gallery-dialog" id="gallery-lightbox" aria-label="Image preview">
     <button type="button" class="dialog-close" id="lightbox-close" aria-label="Close image preview">✕</button>
+    <button type="button" class="lightbox-nav-btn lightbox-prev" id="lightbox-prev" aria-label="Previous image">‹</button>
+    <button type="button" class="lightbox-nav-btn lightbox-next" id="lightbox-next" aria-label="Next image">›</button>
     <img src="" alt="" id="lightbox-img" />
     <p id="lightbox-caption"></p>
   </dialog>
@@ -163,9 +162,9 @@ const galleryPage = {
   }
 
   .album-btn.active {
-    background: var(--red, #941116);
-    color: #fff;
-    border-color: var(--red, #941116);
+    background: #e6e6e6;
+    color: var(--ink, #231f20);
+    border-color: #d0d0d0;
   }
 
   .album-count {
@@ -405,7 +404,11 @@ const galleryPage = {
   const lightbox = document.getElementById("gallery-lightbox");
   const lightboxImg = document.getElementById("lightbox-img");
   const lightboxCaption = document.getElementById("lightbox-caption");
+  const lightboxPrev = document.getElementById("lightbox-prev");
+  const lightboxNext = document.getElementById("lightbox-next");
   const lightboxClose = document.getElementById("lightbox-close");
+  let lightboxItems = [];
+  let lightboxIndex = -1;
 
   function getAlbumContainer(id) {
     return document.getElementById("album-" + id);
@@ -496,13 +499,56 @@ const galleryPage = {
   }
 
   // Lightbox
+  function updateLightboxControls() {
+    if (lightboxPrev) {
+      lightboxPrev.disabled = lightboxIndex <= 0;
+      lightboxPrev.hidden = lightboxItems.length <= 1;
+    }
+    if (lightboxNext) {
+      lightboxNext.disabled = lightboxIndex >= lightboxItems.length - 1;
+      lightboxNext.hidden = lightboxItems.length <= 1;
+    }
+  }
+
+  function openLightbox(index) {
+    if (index < 0 || index >= lightboxItems.length) return;
+    lightboxIndex = index;
+    const btn = lightboxItems[index];
+    if (lightboxImg) { lightboxImg.src = btn.dataset.src || ""; lightboxImg.alt = btn.dataset.alt || ""; }
+    if (lightboxCaption) lightboxCaption.textContent = btn.dataset.caption || btn.dataset.alt || "";
+    updateLightboxControls();
+  }
+
   document.addEventListener("click", (e) => {
     const btn = e.target.closest(".gallery-open");
     if (!btn) return;
-    if (lightboxImg) { lightboxImg.src = btn.dataset.src || ""; lightboxImg.alt = btn.dataset.alt || ""; }
-    if (lightboxCaption) lightboxCaption.textContent = btn.dataset.caption || btn.dataset.alt || "";
+    
+    const albumContainer = btn.closest(".album-images");
+    if (albumContainer) {
+      lightboxItems = Array.from(albumContainer.querySelectorAll(".gallery-open"));
+      lightboxIndex = lightboxItems.indexOf(btn);
+    } else {
+      lightboxItems = [btn];
+      lightboxIndex = 0;
+    }
+
+    openLightbox(lightboxIndex);
     if (lightbox) lightbox.showModal();
   });
+
+  if (lightboxPrev) {
+    lightboxPrev.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openLightbox(lightboxIndex - 1);
+    });
+  }
+
+  if (lightboxNext) {
+    lightboxNext.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openLightbox(lightboxIndex + 1);
+    });
+  }
 
   if (lightboxClose) lightboxClose.addEventListener("click", () => lightbox?.close());
   if (lightbox) lightbox.addEventListener("click", (e) => { if (e.target === lightbox) lightbox.close(); });

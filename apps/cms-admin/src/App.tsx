@@ -6,7 +6,7 @@ import "./styles/app.css";
 type Role = "admin" | "designer" | "contributor";
 type Collection = "pages" | "articles" | "events" | "navigation" | "settings" | "gallery";
 type Tab = "pages" | "menu" | "events" | "articles" | "gallery" | "css" | "settings" | "users" | "json" | "translations";
-type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta" | "fileList";
+type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta" | "fileList" | "contactForm";
 type MediaFolder = "gallery" | "events" | "articles" | "settings";
 
 interface GalleryAlbum {
@@ -72,6 +72,16 @@ interface PageBlock {
   eventIds?: string[] | undefined;
   articleIds?: string[] | undefined;
   files?: Array<{ src: string; label: string; description?: string }> | undefined;
+  showCalendar?: boolean | undefined;
+  columns?: number | undefined;
+  limit?: number | undefined;
+  sort?: "asc" | "desc" | undefined;
+  nameLabel?: string | undefined;
+  emailLabel?: string | undefined;
+  subjectLabel?: string | undefined;
+  messageLabel?: string | undefined;
+  submitLabel?: string | undefined;
+  successMessage?: string | undefined;
 }
 
 interface Page {
@@ -83,6 +93,7 @@ interface Page {
   translationKey: string;
   seo: { title: string; description: string };
   layout?: PageLayout | undefined;
+  miniHero?: string | undefined;
   blocks: PageBlock[];
 }
 
@@ -152,11 +163,16 @@ interface SiteSettings {
   tagline: string;
   description: string;
   siteIcon?: MediaRef | undefined;
+  brandLogo?: MediaRef | undefined;
   defaultLocale: string;
   supportedLanguages: LanguageOption[];
   locales?: string[];
   eventTimeZone: string;
   headerMaxWidth?: number | undefined;
+  backgroundMode?: "gradient" | "solid" | undefined;
+  backgroundColor?: string | undefined;
+  navBackgroundMode?: "transparent" | "gradient" | "solid" | undefined;
+  navBackgroundColor?: string | undefined;
   fonts: {
     default: FontId;
     page?: FontId | undefined;
@@ -167,8 +183,18 @@ interface SiteSettings {
     gallery?: FontId | undefined;
     card?: FontId | undefined;
     cta?: FontId | undefined;
+    defaultSize?: string | undefined;
+    pageSize?: string | undefined;
+    headingsSize?: string | undefined;
+    navigationSize?: string | undefined;
+    eventSize?: string | undefined;
+    articleSize?: string | undefined;
+    gallerySize?: string | undefined;
+    cardSize?: string | undefined;
+    ctaSize?: string | undefined;
   };
   contactEmail: string;
+  contactFormEnabled?: boolean | undefined;
   social: Link[];
 }
 
@@ -716,6 +742,36 @@ function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; upda
         }} />
       )}
 
+      {block.type === "eventList" && (
+        <>
+          <label className="fieldLabel">
+            <strong>Layout Style</strong>
+            <select value={block.showCalendar !== false ? "calendar" : "grid"} onChange={(e) => {
+              const isGrid = e.target.value === "grid";
+              props.update({ 
+                ...block, 
+                showCalendar: isGrid ? false : true,
+                columns: isGrid ? 3 : undefined,
+                sort: isGrid ? "asc" : "desc"
+              });
+            }}>
+              <option value="calendar">Interactive Calendar</option>
+              <option value="grid">Upcoming Events Grid</option>
+            </select>
+          </label>
+          {block.showCalendar === false && (
+            <TextField 
+              label="Max Events" 
+              value={block.limit?.toString() ?? "9"} 
+              onChange={(val) => {
+                const limit = parseInt(val, 10);
+                props.update({ ...block, limit: isNaN(limit) ? undefined : limit });
+              }} 
+            />
+          )}
+        </>
+      )}
+
       {block.type === "fileList" && (
         <>
           <TextArea label="Intro" value={block.intro} onChange={(intro) => props.update({ ...block, intro })} />
@@ -749,6 +805,18 @@ function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; upda
               props.update({ ...block, files: [...(block.files ?? []), { src: result.src, label: result.label }] });
             }
           }}>Upload File (PDF, DOCX, XLSX…)</button>
+        </>
+      )}
+
+      {block.type === "contactForm" && (
+        <>
+          <TextArea label="Intro text" value={block.intro} onChange={(intro) => props.update({ ...block, intro })} />
+          <TextField label="Name field label" value={block.nameLabel} onChange={(nameLabel) => props.update({ ...block, nameLabel })} />
+          <TextField label="Email field label" value={block.emailLabel} onChange={(emailLabel) => props.update({ ...block, emailLabel })} />
+          <TextField label="Subject field label" value={block.subjectLabel} onChange={(subjectLabel) => props.update({ ...block, subjectLabel })} />
+          <TextField label="Message field label" value={block.messageLabel} onChange={(messageLabel) => props.update({ ...block, messageLabel })} />
+          <TextField label="Submit button label" value={block.submitLabel} onChange={(submitLabel) => props.update({ ...block, submitLabel })} />
+          <TextField label="Success message" value={block.successMessage} onChange={(successMessage) => props.update({ ...block, successMessage })} />
         </>
       )}
 
@@ -896,6 +964,9 @@ function App() {
   const [settings, setSettings] = useState<CmsObject<SiteSettings> | null>(null);
   const [navigation, setNavigation] = useState<CmsObject<Navigation> | null>(null);
   const [menuRows, setMenuRows] = useState<MenuRow[]>([]);
+  const [draggedMenuId, setDraggedMenuId] = useState<string | null>(null);
+  const [dragTargetId, setDragTargetId] = useState<string | null>(null);
+  const [dragPosition, setDragPosition] = useState<"before" | "after" | "child" | null>(null);
   const [selectedKey, setSelectedKey] = useState("");
   const [page, setPage] = useState<Page | null>(null);
   const [eventItem, setEventItem] = useState<EventItem | null>(null);
@@ -1507,6 +1578,46 @@ function App() {
     }));
   }
 
+  function handleMenuDrop(targetId: string) {
+    if (!draggedMenuId || draggedMenuId === targetId) {
+      setDraggedMenuId(null);
+      setDragTargetId(null);
+      setDragPosition(null);
+      return;
+    }
+    const targetRow = menuRows.find((r) => r.id === targetId);
+    if (!targetRow || !dragPosition) return;
+    if (wouldCreateMenuCycle(menuRows, draggedMenuId, targetId)) {
+      setDraggedMenuId(null);
+      setDragTargetId(null);
+      setDragPosition(null);
+      return;
+    }
+
+    let newParentId = targetRow.parentId;
+    let newSortBase = targetRow.sort;
+    if (dragPosition === "child") {
+      newParentId = targetRow.id;
+      newSortBase = menuRows.filter((r) => r.parentId === targetRow.id).length;
+    } else if (dragPosition === "after") {
+      newSortBase += 0.5;
+    } else if (dragPosition === "before") {
+      newSortBase -= 0.5;
+    }
+
+    const updatedRows = menuRows.map((row) => {
+      if (row.id === draggedMenuId) {
+        return { ...row, parentId: newParentId, sort: newSortBase };
+      }
+      return row;
+    });
+
+    setMenuRows(normalizeMenuSort(updatedRows));
+    setDraggedMenuId(null);
+    setDragTargetId(null);
+    setDragPosition(null);
+  }
+
   function addMenuChild(parentId: string) {
     const parent = menuRows.find((row) => row.id === parentId);
     const siblingCount = menuRows.filter((row) => row.parentId === parentId).length;
@@ -1691,9 +1802,20 @@ function App() {
     if (!settings) return;
     const fonts = { ...(settings.data.fonts ?? {}), default: settings.data.fonts?.default ?? "universal-serif" };
     if (value) {
-      fonts[key] = value;
+      (fonts as any)[key] = value;
     } else if (key !== "default") {
-      delete fonts[key];
+      delete (fonts as any)[key];
+    }
+    setSettings({ ...settings, data: { ...settings.data, fonts } });
+  }
+
+  function updateSettingsFontSize(key: string, value: string) {
+    if (!settings) return;
+    const fonts = { ...(settings.data.fonts ?? {}), default: settings.data.fonts?.default ?? "universal-serif" };
+    if (value.trim()) {
+      (fonts as any)[key] = value.trim();
+    } else {
+      delete (fonts as any)[key];
     }
     setSettings({ ...settings, data: { ...settings.data, fonts } });
   }
@@ -1702,11 +1824,14 @@ function App() {
     const languageCodes = languages.map((language) => language.code);
     const fallback = FONT_OPTIONS.find((font) => fontSupportsLanguages(font.id, languageCodes))?.id ?? "system-sans";
     const next: SiteSettings["fonts"] = {
-      default: fontSupportsLanguages(fonts.default, languageCodes) ? fonts.default : fallback
+      default: fontSupportsLanguages(fonts.default, languageCodes) ? fonts.default : fallback,
+      defaultSize: fonts.defaultSize
     };
     for (const key of ["page", "headings", "navigation", "event", "article", "gallery", "card", "cta"] as Array<keyof SiteSettings["fonts"]>) {
       const value = fonts[key];
-      if (value && fontSupportsLanguages(value, languageCodes)) next[key] = value;
+      if (value && typeof value === "string" && fontSupportsLanguages(value, languageCodes)) (next as any)[key] = value;
+      const sizeKey = `${key}Size` as keyof SiteSettings["fonts"];
+      if (fonts[sizeKey]) (next as any)[sizeKey] = fonts[sizeKey];
     }
     return next;
   }
@@ -1822,6 +1947,7 @@ function App() {
               <TextField label="Slug" value={page.slug} disabled={!structureAllowed} onChange={(slug) => setPage({ ...page, slug })} />
               <TextField label="SEO title" value={page.seo.title} onChange={(title) => setPage({ ...page, seo: { ...page.seo, title } })} />
               <TextArea label="SEO description" value={page.seo.description} onChange={(description) => setPage({ ...page, seo: { ...page.seo, description } })} />
+              <TextField label="Mini Hero Text (optional)" value={page.miniHero || ""} onChange={(miniHero) => setPage({ ...page, miniHero: miniHero || undefined })} />
             </div>
             {currentPageLayout && (
               <div className="builderCard layoutControls">
@@ -1936,7 +2062,7 @@ function App() {
             )}
             {structureAllowed && (
               <div className="builderCard addBlock">
-                {(["hero", "richText", "cardGrid", "gallery", "eventList", "articleList", "cta", "fileList"] as BlockType[]).map((type) => (
+                {(["hero", "richText", "cardGrid", "gallery", "eventList", "articleList", "cta", "fileList", "contactForm"] as BlockType[]).map((type) => (
                   <button key={type} onClick={() => setPage({ ...page, blocks: [...page.blocks, { type, title: `New ${type}`, layoutColumn: currentPageLayout?.columns[0]?.id ?? "main" }] })}>Add {type}</button>
                 ))}
               </div>
@@ -1984,8 +2110,46 @@ function App() {
                 const siblingIndex = siblings.findIndex((item) => item.id === row.id);
                 const hasChildren = menuRows.some((item) => item.parentId === row.id);
                 return (
-                  <article className="menuItem" style={{ "--menu-depth": row.depth } as CSSProperties} key={row.id}>
-                    <div className="menuDrag">
+                  <article
+                    className="menuItem"
+                    style={{
+                      "--menu-depth": row.depth,
+                      ...(dragTargetId === row.id && dragPosition === "before" ? { borderTop: "4px solid var(--accent)" } : {}),
+                      ...(dragTargetId === row.id && dragPosition === "after" ? { borderBottom: "4px solid var(--accent)" } : {}),
+                      ...(dragTargetId === row.id && dragPosition === "child" ? { backgroundColor: "rgba(0, 100, 255, 0.05)", outline: "2px solid var(--accent)" } : {})
+                    } as CSSProperties}
+                    key={row.id}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      setDraggedMenuId(row.id);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (draggedMenuId === row.id) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const y = e.clientY - rect.top;
+                      if (y < rect.height * 0.25) {
+                        setDragPosition("before");
+                      } else if (y > rect.height * 0.75) {
+                        setDragPosition("after");
+                      } else {
+                        setDragPosition("child");
+                      }
+                      setDragTargetId(row.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragTargetId === row.id) {
+                        setDragTargetId(null);
+                        setDragPosition(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleMenuDrop(row.id);
+                    }}
+                  >
+                    <div className="menuDrag" style={{ cursor: "grab" }}>
                       <strong>{row.depth === 0 ? "Top" : `Level ${row.depth + 1}`}</strong>
                       <button className="small" onClick={() => moveMenuRow(row.id, -1)} disabled={siblingIndex <= 0}>Move Up</button>
                       <button className="small" onClick={() => moveMenuRow(row.id, 1)} disabled={siblingIndex >= siblings.length - 1}>Move Down</button>
@@ -2276,7 +2440,58 @@ function App() {
               <TextField label="Site tagline" value={settings.data.tagline} onChange={(tagline) => setSettings({ ...settings, data: { ...settings.data, tagline } })} />
               <TextArea label="Site description" value={settings.data.description} onChange={(description) => setSettings({ ...settings, data: { ...settings.data, description } })} />
               <ImageField label="Site icon" value={settings.data.siteIcon} onChange={(siteIcon) => setSettings({ ...settings, data: { ...settings.data, siteIcon } })} onUpload={uploadMedia} folder="settings" />
+              <ImageField label="Brand logo" value={settings.data.brandLogo} onChange={(brandLogo) => setSettings({ ...settings, data: { ...settings.data, brandLogo } })} onUpload={uploadMedia} folder="settings" />
               <TextField label="Contact email" value={settings.data.contactEmail} onChange={(contactEmail) => setSettings({ ...settings, data: { ...settings.data, contactEmail } })} />
+              <label className="field">
+                <span>Enable contact form emails</span>
+                <small>When enabled, the contact form on the Contact Us page will send emails via AWS SES. Disable this if the sender identity is not yet verified in SES.</small>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                  <input
+                    type="checkbox"
+                    id="contactFormEnabled"
+                    checked={settings.data.contactFormEnabled ?? false}
+                    onChange={(e) => setSettings({ ...settings, data: { ...settings.data, contactFormEnabled: e.target.checked } })}
+                    style={{ width: 18, height: 18, cursor: "pointer" }}
+                  />
+                  <label htmlFor="contactFormEnabled" style={{ cursor: "pointer", fontWeight: 500 }}>
+                    {settings.data.contactFormEnabled ? "✅ Email sending is enabled" : "⛔ Email sending is disabled"}
+                  </label>
+                </div>
+              </label>
+              
+              <label className="field">
+                <span>Background style</span>
+                <small>Choose between the default subtle gradient or a solid color for the entire page background.</small>
+                <select value={settings.data.backgroundMode ?? "gradient"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundMode: event.target.value as "gradient" | "solid" } })}>
+                  <option value="gradient">Gradient</option>
+                  <option value="solid">Solid Color</option>
+                </select>
+              </label>
+
+              {settings.data.backgroundMode === "solid" && (
+                <label className="field">
+                  <span>Background color</span>
+                  <input type="color" value={settings.data.backgroundColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundColor: event.target.value } })} />
+                </label>
+              )}
+
+              <label className="field">
+                <span>Navigation background style</span>
+                <small>Choose the background style for the top navigation menu.</small>
+                <select value={settings.data.navBackgroundMode ?? "transparent"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBackgroundMode: event.target.value as "transparent" | "gradient" | "solid" } })}>
+                  <option value="transparent">Transparent</option>
+                  <option value="gradient">Gradient</option>
+                  <option value="solid">Solid Color</option>
+                </select>
+              </label>
+
+              {settings.data.navBackgroundMode === "solid" && (
+                <label className="field">
+                  <span>Navigation background color</span>
+                  <input type="color" value={settings.data.navBackgroundColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBackgroundColor: event.target.value } })} />
+                </label>
+              )}
+
               <label className="field">
                 <span>Default event timezone</span>
                 <small>Used for displaying and creating event times. Default is America/Phoenix.</small>
@@ -2304,13 +2519,19 @@ function App() {
                   <h3>Fonts</h3>
                   <p className="muted">Only fonts compatible with every selected supported language are shown. If you add languages later, incompatible choices must be changed before settings can be saved.</p>
                 </div>
-                <label className="field">
-                  <span>Default Font</span>
-                  <select value={settings.data.fonts?.default ?? "universal-serif"} onChange={(event) => updateSettingsFont("default", event.target.value as FontId)}>
-                    {compatibleFonts.map((font) => <option value={font.id} key={font.id}>{font.label}</option>)}
-                  </select>
-                </label>
-                <div className="fontGrid">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <label className="field">
+                    <span>Default Font</span>
+                    <select value={settings.data.fonts?.default ?? "universal-serif"} onChange={(event) => updateSettingsFont("default", event.target.value as FontId)}>
+                      {compatibleFonts.map((font) => <option value={font.id} key={font.id}>{font.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Default Size</span>
+                    <input type="text" placeholder="e.g. 16px, 1.2rem" value={settings.data.fonts?.defaultSize ?? ""} onChange={(event) => updateSettingsFontSize("defaultSize", event.target.value)} />
+                  </label>
+                </div>
+                <div className="fontGrid" style={{ marginTop: "10px" }}>
                   {([
                     ["page", "Pages"],
                     ["headings", "Headings"],
@@ -2321,13 +2542,19 @@ function App() {
                     ["card", "Cards"],
                     ["cta", "Call-to-action sections"]
                   ] as Array<[keyof SiteSettings["fonts"], string]>).map(([key, label]) => (
-                    <label className="field" key={key}>
-                      <span>{label} font</span>
-                      <select value={settings.data.fonts?.[key] ?? ""} onChange={(event) => updateSettingsFont(key, event.target.value as FontId | "")}>
-                        <option value="">Use Default Font</option>
-                        {compatibleFonts.map((font) => <option value={font.id} key={font.id}>{font.label}</option>)}
-                      </select>
-                    </label>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }} key={key}>
+                      <label className="field">
+                        <span>{label} font</span>
+                        <select value={settings.data.fonts?.[key] ?? ""} onChange={(event) => updateSettingsFont(key, event.target.value as FontId | "")}>
+                          <option value="">Use Default Font</option>
+                          {compatibleFonts.map((font) => <option value={font.id} key={font.id}>{font.label}</option>)}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>{label} size</span>
+                        <input type="text" placeholder="e.g. 16px, 1.2rem" value={(settings.data.fonts as any)?.[`${key}Size`] ?? ""} onChange={(event) => updateSettingsFontSize(`${key}Size`, event.target.value)} />
+                      </label>
+                    </div>
                   ))}
                 </div>
               </section>
