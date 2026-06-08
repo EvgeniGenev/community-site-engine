@@ -55,6 +55,7 @@ interface MenuRow {
   href: string;
   parentId: string;
   sort: number;
+  isButton?: boolean;
 }
 
 interface PageBlock {
@@ -403,7 +404,8 @@ function flattenNavigationItems(items: NavigationItem[], parentId = "", rows: Me
       parentId,
       sort: index,
       label: item.label,
-      href: item.href
+      href: item.href,
+      isButton: item.isButton
     });
     flattenNavigationItems(item.children ?? [], id, rows);
   });
@@ -417,6 +419,7 @@ function buildNavigationItems(rows: MenuRow[], parentId = ""): NavigationItem[] 
     .map((row) => ({
       label: row.label,
       href: row.href,
+      isButton: row.isButton,
       children: buildNavigationItems(rows, row.id)
     }));
 }
@@ -2157,6 +2160,16 @@ function App() {
                     <div className="menuFields">
                       <TextField label="Menu label" value={row.label} onChange={(label) => updateMenuRow(row.id, { label })} />
                       <TextField label="Link URL" value={row.href} disabled={hasChildren} onChange={(href) => updateMenuRow(row.id, { href })} />
+                      <label className="field" style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                        <input
+                          type="checkbox"
+                          checked={row.isButton ?? false}
+                          disabled={hasChildren}
+                          onChange={(e) => updateMenuRow(row.id, { isButton: e.target.checked })}
+                          style={{ width: 18, height: 18, cursor: "pointer" }}
+                        />
+                        <span style={{ cursor: "pointer", fontWeight: 500 }}>Style as Button</span>
+                      </label>
                       <label className="field">
                         <span>Use page link</span>
                         <select
@@ -2442,6 +2455,16 @@ function App() {
               <ImageField label="Site icon" value={settings.data.siteIcon} onChange={(siteIcon) => setSettings({ ...settings, data: { ...settings.data, siteIcon } })} onUpload={uploadMedia} folder="settings" />
               <ImageField label="Brand logo" value={settings.data.brandLogo} onChange={(brandLogo) => setSettings({ ...settings, data: { ...settings.data, brandLogo } })} onUpload={uploadMedia} folder="settings" />
               <TextField label="Contact email" value={settings.data.contactEmail} onChange={(contactEmail) => setSettings({ ...settings, data: { ...settings.data, contactEmail } })} />
+              <TextField label="Facebook URL" value={settings.data.social?.find((s) => s.label.toLowerCase() === "facebook")?.href ?? ""} onChange={(href) => {
+                const social = (settings.data.social || []).filter((s) => s.label.toLowerCase() !== "facebook");
+                if (href) social.push({ label: "Facebook", href, variant: "primary" });
+                setSettings({ ...settings, data: { ...settings.data, social } });
+              }} />
+              <TextField label="Instagram URL" value={settings.data.social?.find((s) => s.label.toLowerCase() === "instagram")?.href ?? ""} onChange={(href) => {
+                const social = (settings.data.social || []).filter((s) => s.label.toLowerCase() !== "instagram");
+                if (href) social.push({ label: "Instagram", href, variant: "primary" });
+                setSettings({ ...settings, data: { ...settings.data, social } });
+              }} />
               <label className="field">
                 <span>Enable contact form emails</span>
                 <small>When enabled, the contact form on the Contact Us page will send emails via AWS SES. Disable this if the sender identity is not yet verified in SES.</small>
@@ -2491,6 +2514,31 @@ function App() {
                   <input type="color" value={settings.data.navBackgroundColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBackgroundColor: event.target.value } })} />
                 </label>
               )}
+
+              <section className="colorPickerSection" style={{ marginTop: "24px" }}>
+                <div>
+                  <h3>Calendar Colors</h3>
+                  <p className="muted">Customize the colors used in the events calendar grid.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <label className="field">
+                    <span>Today border color</span>
+                    <input type="color" value={settings.data.calendarTodayColor ?? "#c89d44"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarTodayColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Event highlight color</span>
+                    <input type="color" value={settings.data.calendarEventColor ?? "#c4161c"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarEventColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Button background</span>
+                    <input type="color" value={settings.data.calendarButtonBg ?? "#f5eadc"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarButtonBg: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Button text</span>
+                    <input type="color" value={settings.data.calendarButtonText ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarButtonText: event.target.value } })} />
+                  </label>
+                </div>
+              </section>
 
               <label className="field">
                 <span>Default event timezone</span>

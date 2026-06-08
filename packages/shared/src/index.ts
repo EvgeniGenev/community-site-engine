@@ -398,6 +398,7 @@ export type Event = z.infer<typeof EventSchema>;
 export interface NavigationItem {
   label: string;
   href: string;
+  isButton?: boolean | undefined;
   children: NavigationItem[];
 }
 
@@ -405,6 +406,7 @@ export const NavigationItemSchema: z.ZodType<NavigationItem> = z.lazy(() =>
   z.object({
     label: z.string().min(1),
     href: SafeLinkUrlSchema,
+    isButton: z.boolean().optional(),
     children: z.array(NavigationItemSchema).default([])
   })
 );
@@ -435,7 +437,11 @@ export const SiteSettingsSchema = z.object({
   backgroundMode: z.enum(["gradient", "solid"]).default("gradient").optional(),
   backgroundColor: z.string().default("#ffffff").optional(),
   navBackgroundMode: z.enum(["transparent", "gradient", "solid"]).default("transparent").optional(),
-  navBackgroundColor: z.string().default("#ffffff").optional()
+  navBackgroundColor: z.string().default("#ffffff").optional(),
+  calendarTodayColor: z.string().optional(),
+  calendarEventColor: z.string().optional(),
+  calendarButtonBg: z.string().optional(),
+  calendarButtonText: z.string().optional()
 }).superRefine((settings, ctx) => {
   validateFontSettings(settings.fonts, settings.supportedLanguages.map((language) => language.code), ctx);
 });

@@ -59,6 +59,14 @@ const navBackgroundCss = settings.navBackgroundMode === "solid"
     : `.site-header { background: transparent !important; }`;
 
 const maxCss = `:root { --max: ${maxWidth}px; } body { overflow-x: hidden; } ${backgroundCss} ${navBackgroundCss}`;
+const calendarCss = `
+  :root {
+    --calendar-today: ${settings.calendarTodayColor ?? "var(--gold)"};
+    --calendar-event: ${settings.calendarEventColor ?? "var(--red)"};
+    --calendar-btn-bg: ${settings.calendarButtonBg ?? "var(--soft)"};
+    --calendar-btn-text: ${settings.calendarButtonText ?? "var(--ink)"};
+  }
+`;
 const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
 ---
 <!doctype html>
@@ -75,6 +83,7 @@ const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
     ))}
     <style data-cms-fonts set:html={fontCss} />
     <style data-cms-max set:html={maxCss} />
+    <style data-cms-calendar set:html={calendarCss} />
   </head>
   <body>
     <header class="site-header">
@@ -94,7 +103,7 @@ const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
       <nav class="main-nav" aria-label="Main navigation">
         {navigation.items.map((item) => (
           <div class="nav-item">
-            <a href={item.href} onclick={item.href === "#" ? "event.preventDefault()" : undefined}>{item.label}</a>
+            <a href={item.href} class={item.isButton ? "button primary" : ""} style={item.isButton ? "min-height: 38px; padding: 0 16px; margin-left: 8px; font-size: 14px;" : undefined} onclick={item.href === "#" ? "event.preventDefault()" : undefined}>{item.label}</a>
             {item.children.length > 0 && (
               <div class="nav-dropdown">
                 {item.children.map((child) => <a href={child.href}>{child.label}</a>)}
