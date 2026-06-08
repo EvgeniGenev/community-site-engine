@@ -56,7 +56,7 @@ interface MenuRow {
   href: string;
   parentId: string;
   sort: number;
-  isButton?: boolean;
+  isButton?: boolean | undefined;
 }
 
 interface PageBlock {
