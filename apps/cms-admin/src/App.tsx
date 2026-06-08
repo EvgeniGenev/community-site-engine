@@ -41,6 +41,7 @@ interface Link {
 interface NavigationItem {
   label: string;
   href: string;
+  isButton?: boolean | undefined;
   children: NavigationItem[];
 }
 
@@ -174,6 +175,10 @@ interface SiteSettings {
   backgroundColor?: string | undefined;
   navBackgroundMode?: "transparent" | "gradient" | "solid" | undefined;
   navBackgroundColor?: string | undefined;
+  calendarTodayColor?: string | undefined;
+  calendarEventColor?: string | undefined;
+  calendarButtonBg?: string | undefined;
+  calendarButtonText?: string | undefined;
   fonts: {
     default: FontId;
     page?: FontId | undefined;
