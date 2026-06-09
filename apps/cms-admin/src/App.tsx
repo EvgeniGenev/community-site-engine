@@ -1343,11 +1343,12 @@ function App() {
       startsAt: zonedInputToIso(startFields.date, startFields.time, defaultEventTimeZone),
       endsAt: endFields.date ? zonedInputToIso(endFields.date, endFields.time, defaultEventTimeZone) : undefined
     };
-    await request(token, `/api/object/events/${key}`, { method: "PUT", body: JSON.stringify(normalizedEvent) });
-    setEventItem(normalizedEvent);
-    setSelectedKey(key);
+    const result = await request<{ key: string; data: EventItem }>(token, `/api/object/events/${key}`, { method: "PUT", body: JSON.stringify(normalizedEvent) });
+    setEventItem(result.data);
+    setSelectedKey(result.key);
     const buildMessage = await triggerSiteBuildMessage();
-    setMessage(`Saved ${key}.${buildMessage}`);
+    const createdCount = settings?.data.supportedLanguages.length ? settings.data.supportedLanguages.length - 1 : 0;
+    setMessage(`${createdCount > 0 ? `Saved ${key} and synced ${createdCount} language version${createdCount === 1 ? "" : "s"}` : `Saved ${key}`}.${buildMessage}`);
     await refresh();
   }
 

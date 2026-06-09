@@ -569,15 +569,20 @@ function stripTagsPreservingLineBreaks(value: string) {
 }
 
 /** Deep-search an arbitrary object for a named key, returning first string found. */
-function deepFind(obj: unknown, key: string, maxDepth = 8): string | number | undefined {
-  if (maxDepth <= 0 || !obj || typeof obj !== "object") return undefined;
-  const record = obj as Record<string, unknown>;
-  if (key in record) {
-    const v = record[key];
-    if (typeof v === "string" && v.trim()) return v.trim();
-    if (typeof v === "number" && Number.isFinite(v)) return v;
+function deepFind(obj: unknown, key: string, maxDepth: number = 30): any {
+  if (maxDepth < 0 || !obj || typeof obj !== "object") return undefined;
+  if (key in obj) {
+    const v = (obj as Record<string, unknown>)[key];
+    if (v !== null && v !== undefined && v !== "") return v;
   }
-  for (const val of Object.values(record)) {
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = deepFind(item, key, maxDepth - 1);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+  for (const val of Object.values(obj)) {
     const found = deepFind(val, key, maxDepth - 1);
     if (found !== undefined) return found;
   }
@@ -587,22 +592,48 @@ function deepFind(obj: unknown, key: string, maxDepth = 8): string | number | un
 /** Extract all inline JS assignments like window.__DATA__ = {...} or __NEXT_DATA__ = {...} */
 function embeddedJsonBlobs(html: string): unknown[] {
   const blobs: unknown[] = [];
+  // Parse all <script type="application/json">...</script>
+  const jsonScriptPattern = /<script[^>]+type=["']application\/json["'][^>]*>([\s\S]*?)<\/script\s*>/gi;
+  for (const match of html.matchAll(jsonScriptPattern)) {
+    try {
+      blobs.push(JSON.parse(match[1]!));
+    } catch { /* ignore */ }
+  }
+
   // Pattern: some_var = { ... } or some_var = [ ... ] as a JS assignment in a script tag
-  const scriptPattern = /<script[^>]*>([\s\S]*?)<\/script\s*>/gi;
+  const scriptPattern = /<script(?:(?!\btype=)[^>]*|\s+type=["'](?:text\/javascript|application\/javascript)["'][^>]*)>([\s\S]*?)<\/script\s*>/gi;
   for (const scriptMatch of html.matchAll(scriptPattern)) {
     const script = scriptMatch[1] ?? "";
-    // Look for large JSON objects assigned to variables
-    const assignPattern = /(?:__(?:NEXT|RELAY|SSR|SERVER|INITIAL|BOOTSTRAP|DATA|PAGE)_DATA__|requireLazy|handleServerJS|bigPipe\.onPageletArrive|ScheduledApplyEach|__d\(|bootloadable)\s*[=(,]?\s*(\{[\s\S]{200,})/gi;
+    // Look for large JSON objects or arrays assigned to variables
+    const assignPattern = /(?:__(?:NEXT|RELAY|SSR|SERVER|INITIAL|BOOTSTRAP|DATA|PAGE)_DATA__|requireLazy|handleServerJS|bigPipe\.onPageletArrive|ScheduledApplyEach|__d\(|bootloadable)\s*[=(,]?\s*([{\[][\s\S]{200,})/gi;
     for (const assignMatch of script.matchAll(assignPattern)) {
       const raw = assignMatch[1] ?? "";
-      // Try to find valid JSON by scanning for balanced braces
       let depth = 0;
       let end = 0;
+      let inString = false;
+      let escape = false;
+      const startChar = raw[0];
+      const endChar = startChar === "{" ? "}" : "]";
+      
       for (let i = 0; i < raw.length; i++) {
-        if (raw[i] === "{") depth++;
-        else if (raw[i] === "}") {
-          depth--;
-          if (depth === 0) { end = i + 1; break; }
+        const c = raw[i];
+        if (inString) {
+          if (escape) {
+            escape = false;
+          } else if (c === "\\") {
+            escape = true;
+          } else if (c === '"') {
+            inString = false;
+          }
+        } else {
+          if (c === '"') {
+            inString = true;
+          } else if (c === startChar) {
+            depth++;
+          } else if (c === endChar) {
+            depth--;
+            if (depth === 0) { end = i + 1; break; }
+          }
         }
       }
       if (end > 10) {
@@ -610,13 +641,6 @@ function embeddedJsonBlobs(html: string): unknown[] {
           blobs.push(JSON.parse(raw.slice(0, end)));
         } catch { /* ignore parse failures */ }
       }
-    }
-    // Also try: window._stringTable_ or require("InitialJSLoader") patterns
-    const jsonPattern = /(\{(?:[^{}]|\{[^{}]*\}){500,}\})/g;
-    for (const jsonMatch of script.matchAll(jsonPattern)) {
-      try {
-        blobs.push(JSON.parse(jsonMatch[1]!));
-      } catch { /* ignore */ }
     }
   }
   return blobs;
@@ -642,12 +666,23 @@ interface FbEventData {
  * start_time, end_time, event_description, name, cover_media_renderer, etc.
  */
 function extractFbEventData(obj: unknown, depth = 0): FbEventData {
-  const result: FbEventData = {};
-  if (depth > 12 || !obj || typeof obj !== "object") return result;
+  const result: any = {};
+  if (depth > 25 || !obj || typeof obj !== "object") return result;
 
   const walk = (o: unknown, d: number): void => {
-    if (d > 12 || !o || typeof o !== "object") return;
+    if (d > 25 || !o || typeof o !== "object") return;
     const r = o as Record<string, unknown>;
+
+    // Aggressively capture event_description (which is a TextWithEntities object in FB GraphQL)
+    if ("event_description" in r) {
+      const descObj = r["event_description"] as Record<string, unknown>;
+      if (descObj && typeof descObj === "object" && typeof descObj["text"] === "string") {
+        const text = descObj["text"].trim();
+        if (!result.description || text.length > result.description.length) {
+          result.description = text;
+        }
+      }
+    }
 
     // Check if this looks like an event node
     const hasEventFields = ("start_time" in r || "startTime" in r) &&
@@ -657,20 +692,26 @@ function extractFbEventData(obj: unknown, depth = 0): FbEventData {
       const start = r["start_time"] ?? r["startTime"];
       const end = r["end_time"] ?? r["endTime"];
       const name = r["name"] ?? r["title"];
-      const desc = r["description"] ?? r["event_description"] ?? r["text"];
+      const desc = r["description"] ?? r["text"];
       const cover = r["cover_media_renderer"] ?? r["cover"] ?? r["cover_media"];
       const place = r["event_place"] ?? r["place"] ?? r["location"];
 
       if (typeof start === "number" && !result.startTime) result.startTime = start;
       if (typeof end === "number" && !result.endTime) result.endTime = end;
       if (typeof name === "string" && name.trim() && !result.title) result.title = name.trim();
-      if (typeof desc === "string" && desc.trim() && !result.description) {
-        result.description = desc.trim();
+      if (typeof desc === "string" && desc.trim()) {
+        const text = desc.trim();
+        if (!result.description || text.length > result.description.length) {
+          result.description = text;
+        }
       } else if (desc && typeof desc === "object") {
         // desc might be { text: "..." }
         const textVal = (desc as Record<string, unknown>)["text"];
-        if (typeof textVal === "string" && textVal.trim() && !result.description) {
-          result.description = textVal.trim();
+        if (typeof textVal === "string" && textVal.trim()) {
+          const text = textVal.trim();
+          if (!result.description || text.length > result.description.length) {
+            result.description = text;
+          }
         }
       }
 
@@ -705,11 +746,11 @@ function extractFbEventData(obj: unknown, depth = 0): FbEventData {
       }
     }
 
-    for (const val of Object.values(r)) {
-      if (Array.isArray(val)) {
-        for (const item of val) walk(item, d + 1);
-      } else {
-        walk(val, d + 1);
+    if (Array.isArray(o)) {
+      for (const item of o) walk(item, d + 1);
+    } else {
+      for (const val of Object.values(r)) {
+        if (val && typeof val === "object") walk(val, d + 1);
       }
     }
   };
@@ -718,24 +759,26 @@ function extractFbEventData(obj: unknown, depth = 0): FbEventData {
   return result;
 }
 
-async function importFacebookEvent(url: string, timeZone: string): Promise<Event> {
+export async function importFacebookEvent(url: string, timeZone: string): Promise<Event> {
   const initialUrl = new URL(url);
+  let currentUrl = new URL(url);
   const allowedHosts = new Set(["facebook.com", "www.facebook.com", "m.facebook.com", "fb.me"]);
-  if (!allowedHosts.has(initialUrl.hostname.toLowerCase())) {
-    throw new HTTPException(400, { message: "Only public Facebook event/share links are supported." });
+  if (!allowedHosts.has(currentUrl.hostname.toLowerCase())) {
+    throw new HTTPException(400, { message: "Invalid Facebook event URL." });
   }
 
-  let currentUrl = initialUrl;
-  let response: Response | null = null;
-  for (let redirectCount = 0; redirectCount < 5; redirectCount += 1) {
+  let response: Response | undefined;
+  for (let i = 0; i < 5; i++) {
+    const isShortLink = currentUrl.hostname.toLowerCase() === "fb.me";
     response = await fetch(currentUrl.toString(), {
       redirect: "manual",
       signal: AbortSignal.timeout(15000),
       headers: {
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "en-US,en;q=0.9",
-        // Use a realistic browser UA — Facebook blocks simple bot UAs
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "User-Agent": isShortLink 
+          ? "curl/8.19.0" 
+          : "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
       }
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) break;
@@ -747,24 +790,46 @@ async function importFacebookEvent(url: string, timeZone: string): Promise<Event
     }
   }
   if (!response?.ok) {
+    console.error("Facebook import failed:", { url: currentUrl.toString(), status: response?.status });
     throw new HTTPException(400, { message: `Facebook returned ${response?.status ?? "no response"}. Make sure this is a public event link.` });
   }
   const contentType = response.headers.get("content-type") ?? "";
-  if (contentType && !contentType.toLowerCase().includes("text/html")) {
+      if (contentType && !contentType.toLowerCase().includes("text/html")) {
     throw new HTTPException(400, { message: "Facebook import expected an HTML page." });
   }
   const html = (await response.text()).slice(0, 5_000_000);
 
   // === Layer 1: Embedded JS blobs (most reliable for FB events) ===
+  const fbData: FbEventData = {};
+  
+  // Quick regex fallback for start and end times because Facebook's JSON blobs are often deeply nested or broken
+  const startMatch = html.match(/"start_timestamp"\s*:\s*(\d+)/);
+  if (startMatch && startMatch[1]) {
+    fbData.startTime = parseInt(startMatch[1], 10);
+  }
+  const endMatch = html.match(/"end_timestamp"\s*:\s*(\d+)/);
+  if (endMatch && endMatch[1]) {
+    fbData.endTime = parseInt(endMatch[1], 10);
+  }
+
   const blobs = embeddedJsonBlobs(html);
-  let fbData: FbEventData = {};
+  
+  // Try to find the keys we need inside the blobs
   for (const blob of blobs) {
+    if (!fbData.startTime) {
+      const ts = deepFind(blob, "start_timestamp");
+      if (typeof ts === "number") fbData.startTime = ts;
+    }
     const extracted = extractFbEventData(blob);
     // Merge: prefer whichever has more data
     if (extracted.startTime && !fbData.startTime) fbData.startTime = extracted.startTime;
     if (extracted.endTime && !fbData.endTime) fbData.endTime = extracted.endTime;
     if (extracted.title && !fbData.title) fbData.title = extracted.title;
-    if (extracted.description && !fbData.description) fbData.description = extracted.description;
+    if (extracted.description) {
+      if (!fbData.description || extracted.description.length > fbData.description.length) {
+        fbData.description = extracted.description;
+      }
+    }
     if (extracted.locationName && !fbData.locationName) fbData.locationName = extracted.locationName;
     if (extracted.locationCity && !fbData.locationCity) fbData.locationCity = extracted.locationCity;
     if (extracted.locationStreet && !fbData.locationStreet) fbData.locationStreet = extracted.locationStreet;
