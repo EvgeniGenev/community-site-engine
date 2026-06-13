@@ -1123,6 +1123,8 @@ function localizedArticle(baseArticle: Article, locale: string): Article {
 export function syncLocalizedPage(basePage: Page, existingPage: Page): Page {
   return PageSchema.parse({
     ...basePage,
+    id: existingPage.id,
+    slug: existingPage.slug,
     locale: existingPage.locale,
     title: existingPage.title,
     seo: existingPage.seo,
@@ -1165,6 +1167,8 @@ export function syncLocalizedPage(basePage: Page, existingPage: Page): Page {
 export function syncLocalizedArticle(baseArticle: Article, existingArticle: Article): Article {
   return ArticleSchema.parse({
     ...baseArticle,
+    id: existingArticle.id,
+    slug: existingArticle.slug,
     locale: existingArticle.locale,
     title: existingArticle.title,
     excerpt: existingArticle.excerpt,
