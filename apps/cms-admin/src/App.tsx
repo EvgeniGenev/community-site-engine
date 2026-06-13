@@ -1267,12 +1267,17 @@ function App() {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-    const result = await request<{ src: string; alt: string }>(token, "/api/media", {
-      method: "POST",
-      body: JSON.stringify({ filename: file.name, contentType: file.type, base64, folder })
-    });
-    setMessage(`Uploaded ${file.name}`);
-    return result;
+    try {
+      const result = await request<{ src: string; alt: string }>(token, "/api/media", {
+        method: "POST",
+        body: JSON.stringify({ filename: file.name, contentType: file.type, base64, folder })
+      });
+      setMessage(`Uploaded ${file.name}`);
+      return result;
+    } catch (error) {
+      alert(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
   }
 
   async function uploadFile(): Promise<{ src: string; label: string } | null> {
@@ -1290,12 +1295,17 @@ function App() {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-    const result = await request<{ src: string; label: string }>(token, "/api/files", {
-      method: "POST",
-      body: JSON.stringify({ filename: file.name, contentType: file.type, base64 })
-    });
-    setMessage(`Uploaded ${file.name}`);
-    return result;
+    try {
+      const result = await request<{ src: string; label: string }>(token, "/api/files", {
+        method: "POST",
+        body: JSON.stringify({ filename: file.name, contentType: file.type, base64 })
+      });
+      setMessage(`Uploaded ${file.name}`);
+      return result;
+    } catch (error) {
+      alert(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
   }
 
   async function triggerSiteBuildMessage() {

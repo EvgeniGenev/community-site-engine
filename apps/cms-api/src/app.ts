@@ -1612,16 +1612,16 @@ app.delete("/api/media/*", async (c) => {
   return c.json({ ok: true, key });
 });
 
-const allowedFileTypes = new Map<string, string[]>([
-  ["application/pdf", [".pdf"]],
-  ["application/msword", [".doc"]],
-  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", [".docx"]],
-  ["application/vnd.ms-excel", [".xls"]],
-  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", [".xlsx"]],
-  ["text/csv", [".csv"]],
-  ["application/zip", [".zip"]],
-  ["application/vnd.ms-powerpoint", [".ppt"]],
-  ["application/vnd.openxmlformats-officedocument.presentationml.presentation", [".pptx"]]
+const extensionToContentType = new Map<string, string>([
+  [".pdf", "application/pdf"],
+  [".doc", "application/msword"],
+  [".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  [".xls", "application/vnd.ms-excel"],
+  [".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  [".csv", "text/csv"],
+  [".zip", "application/zip"],
+  [".ppt", "application/vnd.ms-powerpoint"],
+  [".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]
 ]);
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
 
@@ -1637,20 +1637,19 @@ app.post("/api/files", async (c) => {
       base64: z.string().min(1)
     })
     .parse(await c.req.json());
-  const extensions = allowedFileTypes.get(body.contentType);
-  if (!extensions) {
+  const extMatch = body.filename.match(/\.[a-zA-Z0-9]+$/);
+  const ext = extMatch ? extMatch[0].toLowerCase() : "";
+  const actualContentType = extensionToContentType.get(ext);
+  if (!actualContentType) {
     throw new HTTPException(400, { message: "Only PDF, Word, Excel, PowerPoint, CSV, and ZIP files are allowed." });
   }
   const safeName = body.filename.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
-  if (!extensions.some((ext) => safeName.endsWith(ext))) {
-    throw new HTTPException(400, { message: `File extension must match ${body.contentType}.` });
-  }
   const bytes = Buffer.from(body.base64, "base64");
   if (bytes.byteLength > MAX_FILE_BYTES) {
     throw new HTTPException(413, { message: "File uploads must be 20 MB or smaller." });
   }
   const key = `media/files/${Date.now()}-${safeName}`;
-  await storage.putBytes(key, bytes, body.contentType);
+  await storage.putBytes(key, bytes, actualContentType);
   if (config.storageMode === "local") {
     const publicPath = resolve(process.cwd(), "../../apps/site/public", key);
     await mkdir(dirname(publicPath), { recursive: true });
