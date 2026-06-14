@@ -234,11 +234,12 @@ img {
   font-weight: 800;
   text-transform: uppercase;
   text-align: right;
-  padding: var(--mini-hero-padding, 16px) clamp(18px, 4vw, 48px);
+  padding: var(--mini-hero-padding, 16px clamp(18px, 4vw, 48px));
 }
 
 .mini-hero-right {
   background-color: transparent;
+  padding: var(--mini-hero-padding, 16px clamp(18px, 4vw, 48px));
 }
 
 .hero {
