@@ -1,9 +1,9 @@
-import { ArticleSchema, EventSchema, GallerySchema, NavigationSchema, PageSchema, SiteSettingsSchema } from "@community-site-engine/shared";
+import { ArticleSchema, EventSchema, GallerySchema, NavigationSchema, PageSchema, SiteSettingsSchema, ThemeSchema } from "@community-site-engine/shared";
 import { z } from "zod";
 import { writeFile, readFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-const CollectionSchema = z.enum(["pages", "articles", "events", "navigation", "settings", "gallery"]);
+const CollectionSchema = z.enum(["pages", "articles", "events", "navigation", "settings", "gallery", "themes"]);
 export type Collection = z.infer<typeof CollectionSchema>;
 
 export interface CmsClientOptions {
@@ -216,6 +216,7 @@ export function validateContent(collection: Collection, data: unknown) {
   if (collection === "events") return EventSchema.parse(data);
   if (collection === "navigation") return NavigationSchema.parse(data);
   if (collection === "gallery") return GallerySchema.parse(data);
+  if (collection === "themes") return ThemeSchema.parse(data);
   return SiteSettingsSchema.parse(data);
 }
 

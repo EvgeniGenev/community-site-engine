@@ -1,14 +1,15 @@
-import { ArticleSchema, EventSchema, GallerySchema, NavigationSchema, PageSchema, SiteSettingsSchema } from "@community-site-engine/shared";
+import { ArticleSchema, EventSchema, GallerySchema, NavigationSchema, PageSchema, SiteSettingsSchema, ThemeSchema } from "@community-site-engine/shared";
 import { z } from "zod";
 import type { StorageDriver } from "./storage.js";
 
-export const CollectionSchema = z.enum(["pages", "articles", "events", "navigation", "settings", "gallery"]);
+export const CollectionSchema = z.enum(["pages", "articles", "events", "navigation", "settings", "gallery", "themes"]);
 export type Collection = z.infer<typeof CollectionSchema>;
 
 export function collectionPrefix(collection: Collection, locale?: string): string {
   if (collection === "settings") return "settings";
   if (collection === "gallery") return "gallery";
   if (collection === "events") return collection;
+  if (collection === "themes") return "themes";
   return locale ? `${collection}/${locale}` : collection;
 }
 
@@ -18,6 +19,7 @@ export function schemaFor(collection: Collection) {
   if (collection === "events") return EventSchema;
   if (collection === "navigation") return NavigationSchema;
   if (collection === "gallery") return GallerySchema;
+  if (collection === "themes") return ThemeSchema;
   return SiteSettingsSchema;
 }
 

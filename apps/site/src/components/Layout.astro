@@ -50,12 +50,14 @@ const maxWidth = settings.headerMaxWidth ?? 1160;
 
 const backgroundCss = settings.backgroundMode === "solid" 
   ? `body, .site-footer { background: ${settings.backgroundColor ?? "#ffffff"} !important; }`
-  : "";
+  : settings.backgroundMode === "gradient" && (settings.backgroundGradientStart || settings.backgroundGradientEnd)
+    ? `body, .site-footer { background: linear-gradient(180deg, ${settings.backgroundGradientStart ?? "#ffffff"} 0%, ${settings.backgroundGradientEnd ?? "#ffffff"} 100%) !important; }`
+    : "";
 
 const navBackgroundCss = settings.navBackgroundMode === "solid" 
   ? `.site-header { background: ${settings.navBackgroundColor ?? "#ffffff"} !important; }`
   : settings.navBackgroundMode === "gradient"
-    ? `.site-header { background: radial-gradient(circle at 10% 0%, rgba(196, 22, 28, .08), transparent 30rem), linear-gradient(180deg, #fffaf2 0%, #ffffff 45%) !important; }`
+    ? `.site-header { background: linear-gradient(180deg, ${settings.navGradientStart ?? "#fffaf2"} 0%, ${settings.navGradientEnd ?? "#ffffff"} 100%) !important; }`
     : `.site-header { background: transparent !important; }`;
 
 const maxCss = `:root { --max: ${maxWidth}px; } body { overflow-x: hidden; } ${backgroundCss} ${navBackgroundCss}`;
@@ -65,6 +67,51 @@ const calendarCss = `
     --calendar-event: ${settings.calendarEventColor ?? "var(--red)"};
     --calendar-btn-bg: ${settings.calendarButtonBg ?? "var(--soft)"};
     --calendar-btn-text: ${settings.calendarButtonText ?? "var(--ink)"};
+  }
+`;
+const themeCss = `
+  :root {
+    ${settings.themeInk ? `--ink: ${settings.themeInk};` : ""}
+    ${settings.themeMuted ? `--muted: ${settings.themeMuted};` : ""}
+    ${settings.themePaper ? `--paper: ${settings.themePaper};` : ""}
+    ${settings.themeSoft ? `--soft: ${settings.themeSoft};` : ""}
+    ${settings.themeLine ? `--line: ${settings.themeLine};` : ""}
+    ${settings.themeRed ? `--red: ${settings.themeRed};` : ""}
+    ${settings.themeRedDark ? `--red-dark: ${settings.themeRedDark};` : ""}
+    ${settings.themeGold ? `--gold: ${settings.themeGold};` : ""}
+  }
+`;
+const navVarsCss = `
+  :root {
+    ${settings.navBorderColor ? `--nav-border: ${settings.navBorderColor};` : ""}
+    ${settings.navTextColor ? `--nav-text: ${settings.navTextColor};` : ""}
+    ${settings.navHoverBgColor ? `--nav-hover-bg: ${settings.navHoverBgColor};` : ""}
+    ${settings.navLangBgColor ? `--nav-lang-bg: ${settings.navLangBgColor};` : ""}
+    ${settings.navLangTextColor ? `--nav-lang-text: ${settings.navLangTextColor};` : ""}
+    ${settings.navLangActiveBgColor ? `--nav-lang-active-bg: ${settings.navLangActiveBgColor};` : ""}
+    ${settings.navDropdownBgColor ? `--nav-dropdown-bg: ${settings.navDropdownBgColor};` : ""}
+    ${settings.navDropdownBorderColor ? `--nav-dropdown-border: ${settings.navDropdownBorderColor};` : ""}
+    ${settings.navDropdownTextColor ? `--nav-dropdown-text: ${settings.navDropdownTextColor};` : ""}
+    ${settings.navDropdownHoverBgColor ? `--nav-dropdown-hover-bg: ${settings.navDropdownHoverBgColor};` : ""}
+    ${settings.navDropdownHoverTextColor ? `--nav-dropdown-hover-text: ${settings.navDropdownHoverTextColor};` : ""}
+  }
+`;
+const compVarsCss = `
+  :root {
+    ${settings.buttonTextPrimary ? `--btn-text-primary: ${settings.buttonTextPrimary};` : ""}
+    ${settings.buttonTextSecondary ? `--btn-text-secondary: ${settings.buttonTextSecondary};` : ""}
+    ${settings.cardBg ? `--card-bg: ${settings.cardBg};` : ""}
+    ${settings.eventCardBg ? `--event-card-bg: ${settings.eventCardBg};` : ""}
+    ${settings.galleryDialogBg ? `--dialog-bg: ${settings.galleryDialogBg};` : ""}
+    ${settings.galleryDialogBackdrop ? `--dialog-backdrop: ${settings.galleryDialogBackdrop};` : ""}
+    ${settings.ctaText ? `--cta-text: ${settings.ctaText};` : ""}
+    ${settings.ctaTextMuted ? `--cta-text-muted: ${settings.ctaTextMuted};` : ""}
+    ${settings.footerText ? `--footer-text: ${settings.footerText};` : ""}
+    ${settings.footerLinkHover ? `--footer-link-hover: ${settings.footerLinkHover};` : ""}
+    ${settings.editButtonBg ? `--edit-btn-bg: ${settings.editButtonBg};` : ""}
+    ${settings.miniHeroBg ? `--mini-hero-bg: ${settings.miniHeroBg};` : ""}
+    ${settings.miniHeroText ? `--mini-hero-text: ${settings.miniHeroText};` : ""}
+    ${settings.miniHeroPadding ? `--mini-hero-padding: ${settings.miniHeroPadding};` : ""}
   }
 `;
 const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
@@ -81,9 +128,7 @@ const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
     {stylesheets.map((stylesheet) => (
       stylesheet.css.trim() && <style data-cms-css={stylesheet.key} set:html={stylesheet.css} />
     ))}
-    <style data-cms-fonts set:html={fontCss} />
-    <style data-cms-max set:html={maxCss} />
-    <style data-cms-calendar set:html={calendarCss} />
+    <style is:inline set:html={fontCss + maxCss + calendarCss + themeCss + navVarsCss + compVarsCss}></style>
   </head>
   <body>
     <header class="site-header">

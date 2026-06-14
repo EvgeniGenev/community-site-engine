@@ -85,6 +85,26 @@ textarea {
   resize: vertical;
 }
 
+input[type="color"] {
+  padding: 0;
+  height: 44px;
+  cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 9px;
+}
+
+input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 9px;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 300px 330px minmax(0, 1fr);

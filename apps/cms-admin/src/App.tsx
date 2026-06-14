@@ -4,8 +4,8 @@ import { FONT_OPTIONS, fontSupportsLanguages, type FontId } from "@community-sit
 import "./styles/app.css";
 
 type Role = "admin" | "designer" | "contributor";
-type Collection = "pages" | "articles" | "events" | "navigation" | "settings" | "gallery";
-type Tab = "pages" | "menu" | "events" | "articles" | "gallery" | "css" | "settings" | "users" | "json" | "translations";
+type Collection = "pages" | "articles" | "events" | "navigation" | "settings" | "gallery" | "themes";
+type Tab = "pages" | "menu" | "events" | "articles" | "gallery" | "css" | "settings" | "themes" | "users" | "json" | "translations";
 type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta" | "fileList" | "contactForm";
 type MediaFolder = "gallery" | "events" | "articles" | "settings";
 
@@ -173,12 +173,35 @@ interface SiteSettings {
   headerMaxWidth?: number | undefined;
   backgroundMode?: "gradient" | "solid" | undefined;
   backgroundColor?: string | undefined;
+  backgroundGradientStart?: string | undefined;
+  backgroundGradientEnd?: string | undefined;
   navBackgroundMode?: "transparent" | "gradient" | "solid" | undefined;
   navBackgroundColor?: string | undefined;
+  navGradientStart?: string | undefined;
+  navGradientEnd?: string | undefined;
+  navBorderColor?: string | undefined;
+  navTextColor?: string | undefined;
+  navHoverBgColor?: string | undefined;
+  navLangBgColor?: string | undefined;
+  navLangTextColor?: string | undefined;
+  navLangActiveBgColor?: string | undefined;
+  navDropdownBgColor?: string | undefined;
+  navDropdownBorderColor?: string | undefined;
+  navDropdownTextColor?: string | undefined;
+  navDropdownHoverBgColor?: string | undefined;
+  navDropdownHoverTextColor?: string | undefined;
   calendarTodayColor?: string | undefined;
   calendarEventColor?: string | undefined;
   calendarButtonBg?: string | undefined;
   calendarButtonText?: string | undefined;
+  themeInk?: string | undefined;
+  themeMuted?: string | undefined;
+  themePaper?: string | undefined;
+  themeSoft?: string | undefined;
+  themeLine?: string | undefined;
+  themeRed?: string | undefined;
+  themeRedDark?: string | undefined;
+  themeGold?: string | undefined;
   fonts: {
     default: FontId;
     page?: FontId | undefined;
@@ -202,6 +225,12 @@ interface SiteSettings {
   contactEmail: string;
   contactFormEnabled?: boolean | undefined;
   social: Link[];
+}
+
+interface Theme {
+  id: string;
+  name: string;
+  colors: Partial<SiteSettings>;
 }
 
 interface LanguageOption {
@@ -970,6 +999,7 @@ function App() {
   const [selectedAlbumKey, setSelectedAlbumKey] = useState<string>("");
   const [albumDraft, setAlbumDraft] = useState<GalleryAlbum | null>(null);
   const [settings, setSettings] = useState<CmsObject<SiteSettings> | null>(null);
+  const [themes, setThemes] = useState<CmsObject<Theme>[]>([]);
   const [navigation, setNavigation] = useState<CmsObject<Navigation> | null>(null);
   const [menuRows, setMenuRows] = useState<MenuRow[]>([]);
   const [draggedMenuId, setDraggedMenuId] = useState<string | null>(null);
@@ -1016,17 +1046,19 @@ function App() {
     try {
       const me = await request<UserInfo>(activeToken, "/api/me");
       setUser(me);
-      const [loadedPages, loadedEvents, loadedArticles, loadedGallery, loadedSettings, loadedNavigation] = await Promise.all([
+      const [loadedPages, loadedEvents, loadedArticles, loadedGallery, loadedSettings, loadedNavigation, loadedThemes] = await Promise.all([
         request<CmsObject<Page>[]>(activeToken, `/api/list/pages?locale=${locale}`),
         request<CmsObject<EventItem>[]>(activeToken, "/api/list/events"),
         request<CmsObject<Article>[]>(activeToken, `/api/list/articles?locale=${locale}`),
         request<CmsObject<unknown>[]>(activeToken, "/api/list/gallery"),
         request<CmsObject<SiteSettings>[]>(activeToken, "/api/list/settings"),
-        request<CmsObject<Navigation>[]>(activeToken, `/api/list/navigation?locale=${locale}`)
+        request<CmsObject<Navigation>[]>(activeToken, `/api/list/navigation?locale=${locale}`),
+        request<CmsObject<Theme>[]>(activeToken, "/api/list/themes")
       ]);
       setPages(loadedPages);
       setEvents(loadedEvents);
       setArticles(loadedArticles);
+      setThemes(loadedThemes);
       // Separate flat legacy gallery from named albums
       const legacyGallery = loadedGallery.find((item) => item.key === "gallery/gallery-items.json") ?? null;
       setGallery(legacyGallery as CmsObject<MediaRef[]> | null);
@@ -1458,6 +1490,100 @@ function App() {
     await refresh();
   }
 
+  async function saveTheme() {
+    if (!settings) return;
+    const name = window.prompt("Enter a name for this theme preset:");
+    if (!name) return;
+    const id = slugify(name);
+    const theme: Theme = {
+      id,
+      name,
+      colors: {
+        backgroundMode: settings.data.backgroundMode,
+        backgroundColor: settings.data.backgroundColor,
+        backgroundGradientStart: settings.data.backgroundGradientStart,
+        backgroundGradientEnd: settings.data.backgroundGradientEnd,
+        navBackgroundMode: settings.data.navBackgroundMode,
+        navBackgroundColor: settings.data.navBackgroundColor,
+        navGradientStart: settings.data.navGradientStart,
+        navGradientEnd: settings.data.navGradientEnd,
+        navBorderColor: settings.data.navBorderColor,
+        navTextColor: settings.data.navTextColor,
+        navHoverBgColor: settings.data.navHoverBgColor,
+        navLangBgColor: settings.data.navLangBgColor,
+        navLangTextColor: settings.data.navLangTextColor,
+        navLangActiveBgColor: settings.data.navLangActiveBgColor,
+        navDropdownBgColor: settings.data.navDropdownBgColor,
+        navDropdownBorderColor: settings.data.navDropdownBorderColor,
+        navDropdownTextColor: settings.data.navDropdownTextColor,
+        navDropdownHoverBgColor: settings.data.navDropdownHoverBgColor,
+        navDropdownHoverTextColor: settings.data.navDropdownHoverTextColor,
+        buttonTextPrimary: settings.data.buttonTextPrimary,
+        buttonTextSecondary: settings.data.buttonTextSecondary,
+        cardBg: settings.data.cardBg,
+        eventCardBg: settings.data.eventCardBg,
+        galleryDialogBg: settings.data.galleryDialogBg,
+        galleryDialogBackdrop: settings.data.galleryDialogBackdrop,
+        ctaText: settings.data.ctaText,
+        ctaTextMuted: settings.data.ctaTextMuted,
+        footerText: settings.data.footerText,
+        footerLinkHover: settings.data.footerLinkHover,
+        editButtonBg: settings.data.editButtonBg,
+        miniHeroBg: settings.data.miniHeroBg,
+        miniHeroText: settings.data.miniHeroText,
+        miniHeroPadding: settings.data.miniHeroPadding,
+        calendarTodayColor: settings.data.calendarTodayColor,
+        calendarEventColor: settings.data.calendarEventColor,
+        calendarButtonBg: settings.data.calendarButtonBg,
+        calendarButtonText: settings.data.calendarButtonText,
+        themeInk: settings.data.themeInk,
+        themeMuted: settings.data.themeMuted,
+        themePaper: settings.data.themePaper,
+        themeSoft: settings.data.themeSoft,
+        themeLine: settings.data.themeLine,
+        themeRed: settings.data.themeRed,
+        themeRedDark: settings.data.themeRedDark,
+        themeGold: settings.data.themeGold
+      }
+    };
+    try {
+      await request(token, `/api/object/themes/themes/${id}.json`, { method: "PUT", body: JSON.stringify(theme) });
+      setMessage(`Saved theme "${name}".`);
+      await refresh();
+    } catch (e) {
+      alert("Failed to save theme: " + String(e));
+    }
+  }
+
+  async function loadTheme(theme: Theme) {
+    if (!settings) return;
+    if (!window.confirm(`Apply theme "${theme.name}"? This will overwrite your current color settings.`)) return;
+
+    const newSettingsData = { ...settings.data };
+    const colorKeys = [
+      "backgroundMode", "backgroundColor", "backgroundGradientStart", "backgroundGradientEnd",
+      "navBackgroundMode", "navBackgroundColor", "navGradientStart", "navGradientEnd",
+      "navBorderColor", "navTextColor", "navHoverBgColor", "navLangBgColor", "navLangTextColor",
+      "navLangActiveBgColor", "navDropdownBgColor", "navDropdownBorderColor", "navDropdownTextColor",
+      "navDropdownHoverBgColor", "navDropdownHoverTextColor", "buttonTextPrimary", "buttonTextSecondary",
+      "cardBg", "eventCardBg", "galleryDialogBg", "galleryDialogBackdrop", "ctaText", "ctaTextMuted",
+      "footerText", "footerLinkHover", "editButtonBg", "miniHeroBg", "miniHeroText", "miniHeroPadding", "calendarTodayColor", "calendarEventColor",
+      "calendarButtonBg", "calendarButtonText", "themeInk", "themeMuted", "themePaper", "themeSoft",
+      "themeLine", "themeRed", "themeRedDark", "themeGold"
+    ];
+    for (const key of colorKeys) {
+      delete (newSettingsData as any)[key];
+    }
+
+    setSettings({
+      ...settings,
+      data: {
+        ...newSettingsData,
+        ...theme.colors
+      }
+    });
+  }
+
   async function downloadBackup() {
     setBackupBusy(true);
     try {
@@ -1751,7 +1877,7 @@ function App() {
   }, [tab, pages, events, articles, cssFiles]);
 
   const visibleTabs: Tab[] = user?.role === "admin"
-    ? ["events", "articles", "gallery", "pages", "menu", "settings", "users", "css", "json", "translations"]
+    ? ["events", "articles", "gallery", "pages", "menu", "settings", "themes", "users", "css", "json", "translations"]
     : user?.role === "designer"
       ? ["events", "articles", "gallery", "pages", "menu", "css"]
       : ["events", "articles", "gallery", "pages"];
@@ -1915,7 +2041,7 @@ function App() {
         </nav>
       </aside>
 
-      {tab !== "menu" && tab !== "gallery" && tab !== "json" && tab !== "settings" && tab !== "users" && tab !== "translations" && (
+      {tab !== "menu" && tab !== "gallery" && tab !== "json" && tab !== "settings" && tab !== "themes" && tab !== "users" && tab !== "translations" && (
         <section className="items">
           <header className="listHeader">
             <h2>{tab}</h2>
@@ -1943,7 +2069,7 @@ function App() {
       )}
 
       {tab !== "translations" && (
-        <section className={tab === "menu" || tab === "gallery" || tab === "settings" || tab === "users" || tab === "json" ? "editor builder wideEditor" : "editor builder"}>
+        <section className={tab === "menu" || tab === "gallery" || tab === "settings" || tab === "themes" || tab === "users" || tab === "json" ? "editor builder wideEditor" : "editor builder"}>
         {tab === "pages" && page && (
           <>
             <header className="editorHeader">
@@ -2499,64 +2625,6 @@ function App() {
               </label>
               
               <label className="field">
-                <span>Background style</span>
-                <small>Choose between the default subtle gradient or a solid color for the entire page background.</small>
-                <select value={settings.data.backgroundMode ?? "gradient"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundMode: event.target.value as "gradient" | "solid" } })}>
-                  <option value="gradient">Gradient</option>
-                  <option value="solid">Solid Color</option>
-                </select>
-              </label>
-
-              {settings.data.backgroundMode === "solid" && (
-                <label className="field">
-                  <span>Background color</span>
-                  <input type="color" value={settings.data.backgroundColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundColor: event.target.value } })} />
-                </label>
-              )}
-
-              <label className="field">
-                <span>Navigation background style</span>
-                <small>Choose the background style for the top navigation menu.</small>
-                <select value={settings.data.navBackgroundMode ?? "transparent"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBackgroundMode: event.target.value as "transparent" | "gradient" | "solid" } })}>
-                  <option value="transparent">Transparent</option>
-                  <option value="gradient">Gradient</option>
-                  <option value="solid">Solid Color</option>
-                </select>
-              </label>
-
-              {settings.data.navBackgroundMode === "solid" && (
-                <label className="field">
-                  <span>Navigation background color</span>
-                  <input type="color" value={settings.data.navBackgroundColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBackgroundColor: event.target.value } })} />
-                </label>
-              )}
-
-              <section className="colorPickerSection" style={{ marginTop: "24px" }}>
-                <div>
-                  <h3>Calendar Colors</h3>
-                  <p className="muted">Customize the colors used in the events calendar grid.</p>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <label className="field">
-                    <span>Today border color</span>
-                    <input type="color" value={settings.data.calendarTodayColor ?? "#c89d44"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarTodayColor: event.target.value } })} />
-                  </label>
-                  <label className="field">
-                    <span>Event highlight color</span>
-                    <input type="color" value={settings.data.calendarEventColor ?? "#c4161c"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarEventColor: event.target.value } })} />
-                  </label>
-                  <label className="field">
-                    <span>Button background</span>
-                    <input type="color" value={settings.data.calendarButtonBg ?? "#f5eadc"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarButtonBg: event.target.value } })} />
-                  </label>
-                  <label className="field">
-                    <span>Button text</span>
-                    <input type="color" value={settings.data.calendarButtonText ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarButtonText: event.target.value } })} />
-                  </label>
-                </div>
-              </section>
-
-              <label className="field">
                 <span>Default event timezone</span>
                 <small>Used for displaying and creating event times. Default is America/Phoenix.</small>
                 <select value={settings.data.eventTimeZone ?? "America/Phoenix"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, eventTimeZone: event.target.value } })}>
@@ -2684,6 +2752,302 @@ function App() {
           </>
         )}
 
+        {tab === "themes" && user?.role === "admin" && settings && (
+          <>
+            <header className="editorHeader">
+              <h2>Themes & Colors</h2>
+              <button onClick={saveSettings}>Save Active Theme Colors</button>
+            </header>
+            <div className="builderCard">
+              <section style={{ marginBottom: "24px" }}>
+                <div>
+                  <h3>Theme Presets</h3>
+                  <p className="muted">Save your current color configuration as a named preset or apply a saved preset.</p>
+                </div>
+                <div style={{ display: "flex", gap: "10px", marginTop: "12px", marginBottom: "20px", alignItems: "center" }}>
+                  <button onClick={saveTheme}>Save Current Colors as New Preset</button>
+                  {themes.length > 0 && (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const theme = themes.find((t) => t.key === e.target.value);
+                        if (theme) void loadTheme(theme.data);
+                      }}
+                      style={{ flex: 1, maxWidth: "300px", margin: 0 }}
+                    >
+                      <option value="" disabled>Apply a saved preset...</option>
+                      {themes.map((t) => (
+                        <option key={t.key} value={t.key}>{t.data.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </section>
+
+              <label className="field">
+                <span>Background style</span>
+                <small>Choose between the default subtle gradient or a solid color for the entire page background.</small>
+                <select value={settings.data.backgroundMode ?? "gradient"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundMode: event.target.value as "gradient" | "solid" } })}>
+                  <option value="gradient">Gradient</option>
+                  <option value="solid">Solid Color</option>
+                </select>
+              </label>
+
+              {settings.data.backgroundMode === "solid" && (
+                <label className="field">
+                  <span>Background color</span>
+                  <input type="color" value={settings.data.backgroundColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundColor: event.target.value } })} />
+                </label>
+              )}
+
+              {(settings.data.backgroundMode === "gradient" || !settings.data.backgroundMode) && (
+                <>
+                  <label className="field">
+                    <span>Background gradient start color</span>
+                    <input type="color" value={settings.data.backgroundGradientStart ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundGradientStart: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Background gradient end color</span>
+                    <input type="color" value={settings.data.backgroundGradientEnd ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, backgroundGradientEnd: event.target.value } })} />
+                  </label>
+                </>
+              )}
+
+              <label className="field">
+                <span>Navigation background style</span>
+                <small>Choose the background style for the top navigation menu.</small>
+                <select value={settings.data.navBackgroundMode ?? "transparent"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBackgroundMode: event.target.value as "transparent" | "gradient" | "solid" } })}>
+                  <option value="transparent">Transparent</option>
+                  <option value="gradient">Gradient</option>
+                  <option value="solid">Solid Color</option>
+                </select>
+              </label>
+
+              {settings.data.navBackgroundMode === "solid" && (
+                <label className="field">
+                  <span>Navigation background color</span>
+                  <input type="color" value={settings.data.navBackgroundColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBackgroundColor: event.target.value } })} />
+                </label>
+              )}
+
+              {settings.data.navBackgroundMode === "gradient" && (
+                <>
+                  <label className="field">
+                    <span>Navigation gradient start color</span>
+                    <input type="color" value={settings.data.navGradientStart ?? "#fffaf2"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navGradientStart: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Navigation gradient end color</span>
+                    <input type="color" value={settings.data.navGradientEnd ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navGradientEnd: event.target.value } })} />
+                  </label>
+                </>
+              )}
+
+              <section className="colorPickerSection" style={{ marginTop: "24px" }}>
+                <div>
+                  <h3>Navigation Menu Colors</h3>
+                  <p className="muted">Customize the colors for the links, borders, and dropdowns in the navigation menu.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <label className="field">
+                    <span>Menu Border Color</span>
+                    <input type="color" value={settings.data.navBorderColor ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navBorderColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Menu Link Text</span>
+                    <input type="color" value={settings.data.navTextColor ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navTextColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Menu Link Hover Background</span>
+                    <input type="color" value={settings.data.navHoverBgColor ?? "#f5eadc"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navHoverBgColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dropdown Background</span>
+                    <input type="color" value={settings.data.navDropdownBgColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navDropdownBgColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dropdown Border</span>
+                    <input type="color" value={settings.data.navDropdownBorderColor ?? "#e6d8c6"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navDropdownBorderColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dropdown Link Text</span>
+                    <input type="color" value={settings.data.navDropdownTextColor ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navDropdownTextColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dropdown Link Hover Background</span>
+                    <input type="color" value={settings.data.navDropdownHoverBgColor ?? "#fffaf2"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navDropdownHoverBgColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dropdown Link Hover Text</span>
+                    <input type="color" value={settings.data.navDropdownHoverTextColor ?? "#c4161c"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navDropdownHoverTextColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Language Switcher Background</span>
+                    <input type="color" value={settings.data.navLangBgColor ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navLangBgColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Language Switcher Text</span>
+                    <input type="color" value={settings.data.navLangTextColor ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navLangTextColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Language Active Background</span>
+                    <input type="color" value={settings.data.navLangActiveBgColor ?? "#c4161c"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, navLangActiveBgColor: event.target.value } })} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="colorPickerSection" style={{ marginTop: "24px" }}>
+                <div>
+                  <h3>Calendar Colors</h3>
+                  <p className="muted">Customize the colors used in the events calendar grid.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <label className="field">
+                    <span>Today border color</span>
+                    <input type="color" value={settings.data.calendarTodayColor ?? "#c89d44"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarTodayColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Event highlight color</span>
+                    <input type="color" value={settings.data.calendarEventColor ?? "#c4161c"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarEventColor: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Button background</span>
+                    <input type="color" value={settings.data.calendarButtonBg ?? "#f5eadc"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarButtonBg: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Button text</span>
+                    <input type="color" value={settings.data.calendarButtonText ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, calendarButtonText: event.target.value } })} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="colorPickerSection" style={{ marginTop: "24px" }}>
+                <div>
+                  <h3>Site CSS Variables</h3>
+                  <p className="muted">Override the core theme colors used throughout the site components.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <label className="field">
+                    <span>Text (Ink)</span>
+                    <input type="color" value={settings.data.themeInk ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themeInk: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Text Muted</span>
+                    <input type="color" value={settings.data.themeMuted ?? "#6f6861"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themeMuted: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Paper Background</span>
+                    <input type="color" value={settings.data.themePaper ?? "#fffaf2"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themePaper: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Soft Accent</span>
+                    <input type="color" value={settings.data.themeSoft ?? "#f5eadc"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themeSoft: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Line Border</span>
+                    <input type="color" value={settings.data.themeLine ?? "#e6d8c6"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themeLine: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Primary Red</span>
+                    <input type="color" value={settings.data.themeRed ?? "#c4161c"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themeRed: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dark Red</span>
+                    <input type="color" value={settings.data.themeRedDark ?? "#921015"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themeRedDark: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Gold Accent</span>
+                    <input type="color" value={settings.data.themeGold ?? "#c89d44"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, themeGold: event.target.value } })} />
+                  </label>
+                </div>
+              </section>
+
+              <section style={{ marginTop: "32px", borderTop: "1px solid var(--line)", paddingTop: "32px" }}>
+                <div>
+                  <h3>Component Colors</h3>
+                  <p className="muted">Colors for individual components like buttons, cards, and popups.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginTop: "16px" }}>
+                  <label className="field">
+                    <span>Primary Button Text</span>
+                    <input type="color" value={settings.data.buttonTextPrimary ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, buttonTextPrimary: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Secondary Button Text</span>
+                    <input type="color" value={settings.data.buttonTextSecondary ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, buttonTextSecondary: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Card Background</span>
+                    <input type="color" value={settings.data.cardBg ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, cardBg: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Event Card Background</span>
+                    <input type="color" value={settings.data.eventCardBg ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, eventCardBg: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dialog Background</span>
+                    <input type="color" value={settings.data.galleryDialogBg ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, galleryDialogBg: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Dialog Backdrop</span>
+                    <input type="color" value={settings.data.galleryDialogBackdrop ?? "#14100f"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, galleryDialogBackdrop: event.target.value } })} />
+                  </label>
+                </div>
+              </section>
+
+              <section style={{ marginTop: "32px", borderTop: "1px solid var(--line)", paddingTop: "32px" }}>
+                <div>
+                  <h3>Mini-Hero Component</h3>
+                  <p className="muted">Styling for the mini-hero block displayed at the top of pages.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginTop: "16px" }}>
+                  <label className="field">
+                    <span>Background Color</span>
+                    <input type="color" value={settings.data.miniHeroBg ?? "#e6e6e6"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, miniHeroBg: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Text Color</span>
+                    <input type="color" value={settings.data.miniHeroText ?? "#231f20"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, miniHeroText: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Vertical Padding (e.g. 16px)</span>
+                    <input type="text" value={settings.data.miniHeroPadding ?? "16px"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, miniHeroPadding: event.target.value } })} />
+                  </label>
+                </div>
+              </section>
+
+              <section style={{ marginTop: "32px", borderTop: "1px solid var(--line)", paddingTop: "32px" }}>
+                <div>
+                  <h3>Content Area Colors</h3>
+                  <p className="muted">Text and link colors for footers and call-to-action blocks.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginTop: "16px" }}>
+                  <label className="field">
+                    <span>CTA Text Primary</span>
+                    <input type="color" value={settings.data.ctaText ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, ctaText: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>CTA Text Muted</span>
+                    <input type="color" value={settings.data.ctaTextMuted ?? "#c6c6c6"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, ctaTextMuted: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Footer Text</span>
+                    <input type="color" value={settings.data.footerText ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, footerText: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Footer Link Hover</span>
+                    <input type="color" value={settings.data.footerLinkHover ?? "#c6c6c6"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, footerLinkHover: event.target.value } })} />
+                  </label>
+                  <label className="field">
+                    <span>Inline Edit Button</span>
+                    <input type="color" value={settings.data.editButtonBg ?? "#ffffff"} onChange={(event) => setSettings({ ...settings, data: { ...settings.data, editButtonBg: event.target.value } })} />
+                  </label>
+                </div>
+              </section>
+            </div>
+          </>
+        )}
+
         {tab === "users" && user?.role === "admin" && (
           <>
             <header className="editorHeader">
@@ -2801,7 +3165,7 @@ function App() {
           </>
         )}
 
-        {tab !== "menu" && tab !== "gallery" && tab !== "css" && tab !== "json" && tab !== "settings" && tab !== "users" && !page && !eventItem && !article && (
+        {tab !== "menu" && tab !== "gallery" && tab !== "css" && tab !== "json" && tab !== "settings" && tab !== "themes" && tab !== "users" && !page && !eventItem && !article && (
           <div className="emptyState">
             <h2>Select an item</h2>
             <p>Choose content from the list, or create a new item if your role allows it.</p>
