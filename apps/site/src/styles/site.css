@@ -724,10 +724,27 @@ h3 {
     align-items: stretch;
   }
 
+  .site-header {
+    padding: 12px 16px;
+  }
+
+  .brand-logo {
+    max-height: 64px;
+  }
+
   .nav-item > a {
     width: 100%;
     justify-content: center;
     background: var(--nav-mobile-bg, rgba(255, 255, 255, .7));
+    font-size: 13px !important;
+    min-height: 38px !important;
+    padding: 0 10px !important;
+    margin-left: 0 !important;
+  }
+
+  .language {
+    font-size: 13px;
+    min-height: 38px;
   }
 
   .nav-dropdown {
