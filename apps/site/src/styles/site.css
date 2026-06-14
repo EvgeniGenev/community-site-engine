@@ -782,3 +782,15 @@ h3 {
     border-radius: 12px;
   }
 }
+
+.footer-social, .footer-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.social-icons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
