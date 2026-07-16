@@ -129,19 +129,49 @@ const articleScripts: string[] = [];
 <div class:list={["page-layout", { "page-layout--single": !hasMultiColumnLayout }]} data-columns={activeLayout.columns.length} style={pageGridStyle}>
 {blocks.map((block) => {
   if (block.type === "hero") {
+    const hasCopy = !!(block.eyebrow || block.title || block.body || (block.actions && block.actions.length > 0));
     return (
-      <section class="hero section" style={blockStyle(block)}>
-        <div class="hero-copy">
-          {block.eyebrow && <p class="eyebrow">{block.eyebrow}</p>}
-          <h1>{block.title}</h1>
-          {block.body && <p class="lede">{block.body}</p>}
-          {block.actions.length > 0 && (
-            <div class="actions">
-              {block.actions.map((action) => <a class={`button ${action.variant}`} href={action.href}>{action.label}</a>)}
-            </div>
-          )}
-        </div>
+      <section class:list={["hero section", { "hero--no-copy": !hasCopy }]} style={blockStyle(block)}>
+        {hasCopy && (
+          <div class="hero-copy">
+            {block.eyebrow && <p class="eyebrow">{block.eyebrow}</p>}
+            <h1>{block.title}</h1>
+            {block.body && <p class="lede">{block.body}</p>}
+            {block.actions.length > 0 && (
+              <div class="actions">
+                {block.actions.map((action) => <a class={`button ${action.variant}`} href={action.href}>{action.label}</a>)}
+              </div>
+            )}
+          </div>
+        )}
         {block.image && <img class="hero-image" src={block.image.src} alt={block.image.alt} />}
+      </section>
+    );
+  }
+
+  if (block.type === "sponsorGrid") {
+    return (
+      <section class="section sponsor-grid-section" style={blockStyle(block)}>
+        {block.title && <h2>{block.title}</h2>}
+        {block.intro && <p class="section-intro">{block.intro}</p>}
+        <div class="sponsor-rows">
+          {block.rows.map((row) => (
+            <div class="sponsor-row">
+              {row.sponsors.map((sponsor) => {
+                const img = <img src={sponsor.logo.src} alt={sponsor.logo.alt} class="sponsor-logo" loading="lazy" />;
+                return sponsor.href ? (
+                  <a href={sponsor.href} target="_blank" rel="noopener noreferrer" class="sponsor-link" title={sponsor.name}>
+                    {img}
+                  </a>
+                ) : (
+                  <span class="sponsor-link sponsor-no-link" title={sponsor.name}>
+                    {img}
+                  </span>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </section>
     );
   }

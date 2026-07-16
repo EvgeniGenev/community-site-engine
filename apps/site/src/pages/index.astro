@@ -12,11 +12,5 @@ const articles = await getArticles("en");
 const galleryItems = await getGallery("en");
 ---
 <Layout page={page} settings={settings} navigation={navigation}>
-  <div class="mini-hero section">
-    <div class="mini-hero-left">
-      {page.miniHero || page.title}
-    </div>
-    <div class="mini-hero-right"></div>
-  </div>
   <Blocks blocks={page.blocks} layout={page.layout} events={events} articles={articles} galleryItems={galleryItems} eventTimeZone={settings.eventTimeZone} locale={page.locale} contactFormEnabled={settings.contactFormEnabled ?? false} />
 </Layout>

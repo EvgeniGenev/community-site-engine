@@ -310,6 +310,25 @@ export const ContactFormBlockSchema = z.object({
 });
 export type ContactFormBlock = z.infer<typeof ContactFormBlockSchema>;
 
+export const SponsorGridBlockSchema = z.object({
+  type: z.literal("sponsorGrid"),
+  title: z.string().optional(),
+  intro: z.string().optional(),
+  rows: z.array(
+    z.object({
+      sponsors: z.array(
+        z.object({
+          name: z.string().min(1),
+          logo: MediaRefSchema,
+          href: SafeLinkUrlSchema.optional()
+        })
+      )
+    })
+  ),
+  ...CustomCssSchema
+});
+export type SponsorGridBlock = z.infer<typeof SponsorGridBlockSchema>;
+
 export const PageBlockSchema = z.discriminatedUnion("type", [
   HeroBlockSchema,
   RichTextBlockSchema,
@@ -319,7 +338,8 @@ export const PageBlockSchema = z.discriminatedUnion("type", [
   ArticleListBlockSchema,
   CtaBlockSchema,
   FileListBlockSchema,
-  ContactFormBlockSchema
+  ContactFormBlockSchema,
+  SponsorGridBlockSchema
 ]).and(z.object({
   layoutColumn: z.string().optional()
 }));

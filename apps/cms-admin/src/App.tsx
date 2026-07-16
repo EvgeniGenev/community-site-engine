@@ -6,7 +6,7 @@ import "./styles/app.css";
 type Role = "admin" | "designer" | "contributor";
 type Collection = "pages" | "articles" | "events" | "navigation" | "settings" | "gallery" | "themes";
 type Tab = "pages" | "menu" | "events" | "articles" | "gallery" | "css" | "settings" | "themes" | "users" | "json" | "translations";
-type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta" | "fileList" | "contactForm";
+type BlockType = "hero" | "richText" | "cardGrid" | "gallery" | "eventList" | "articleList" | "cta" | "fileList" | "contactForm" | "sponsorGrid";
 type MediaFolder = "gallery" | "events" | "articles" | "settings";
 
 interface GalleryAlbum {
@@ -84,6 +84,13 @@ interface PageBlock {
   messageLabel?: string | undefined;
   submitLabel?: string | undefined;
   successMessage?: string | undefined;
+  rows?: Array<{
+    sponsors: Array<{
+      name: string;
+      logo: MediaRef;
+      href?: string | undefined;
+    }>;
+  }> | undefined;
 }
 
 interface Page {
@@ -741,7 +748,7 @@ function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; upda
         {!props.disabledStructure && <button className="danger small" onClick={props.remove}>Remove Section</button>}
       </header>
 
-      {(block.type === "hero" || block.type === "richText" || block.type === "cardGrid" || block.type === "gallery" || block.type === "eventList" || block.type === "articleList" || block.type === "cta") && (
+      {(block.type === "hero" || block.type === "richText" || block.type === "cardGrid" || block.type === "gallery" || block.type === "eventList" || block.type === "articleList" || block.type === "cta" || block.type === "sponsorGrid") && (
         <TextField label="Section title" value={block.title} onChange={(title) => props.update({ ...block, title })} />
       )}
 
@@ -873,6 +880,66 @@ function BlockEditor(props: { block: PageBlock; disabledStructure: boolean; upda
 
       {block.type === "cta" && (
         <TextArea label="CTA body" value={block.body} onChange={(body) => props.update({ ...block, body })} />
+      )}
+
+      {block.type === "sponsorGrid" && (
+        <>
+          <TextArea label="Intro" value={block.intro} onChange={(intro) => props.update({ ...block, intro })} />
+          {(block.rows ?? []).map((row, rowIndex) => (
+            <div className="nested-group" key={rowIndex} style={{ border: "1px solid var(--line)", padding: "12px", borderRadius: "8px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong>Row {rowIndex + 1}</strong>
+                {!props.disabledStructure && (
+                  <button className="danger small" onClick={() => {
+                    props.update({ ...block, rows: (block.rows ?? []).filter((_, i) => i !== rowIndex) });
+                  }}>Remove Row</button>
+                )}
+              </div>
+              {(row.sponsors ?? []).map((sponsor, sponsorIndex) => (
+                <div className="nested" key={sponsorIndex} style={{ marginLeft: "12px", borderLeft: "2px solid var(--line)", paddingLeft: "12px", marginBottom: "12px" }}>
+                  <TextField label="Sponsor name" value={sponsor.name} onChange={(name) => {
+                    const rows = [...(block.rows ?? [])];
+                    const sponsors = [...(row.sponsors ?? [])];
+                    sponsors[sponsorIndex] = { ...sponsor, name };
+                    rows[rowIndex] = { ...row, sponsors };
+                    props.update({ ...block, rows });
+                  }} />
+                  <TextField label="Link URL" value={sponsor.href} onChange={(href) => {
+                    const rows = [...(block.rows ?? [])];
+                    const sponsors = [...(row.sponsors ?? [])];
+                    sponsors[sponsorIndex] = { ...sponsor, href };
+                    rows[rowIndex] = { ...row, sponsors };
+                    props.update({ ...block, rows });
+                  }} />
+                  <ImageField label="Logo" value={sponsor.logo} onChange={(logo) => {
+                    const rows = [...(block.rows ?? [])];
+                    const sponsors = [...(row.sponsors ?? [])];
+                    sponsors[sponsorIndex] = { ...sponsor, logo: logo ?? { src: "", alt: "" } };
+                    rows[rowIndex] = { ...row, sponsors };
+                    props.update({ ...block, rows });
+                  }} onUpload={props.onUpload} folder="gallery" />
+                  {!props.disabledStructure && (
+                    <button className="danger small" onClick={() => {
+                      const rows = [...(block.rows ?? [])];
+                      rows[rowIndex] = { ...row, sponsors: row.sponsors.filter((_, i) => i !== sponsorIndex) };
+                      props.update({ ...block, rows });
+                    }}>Remove Sponsor</button>
+                  )}
+                </div>
+              ))}
+              {!props.disabledStructure && (
+                <button onClick={() => {
+                  const rows = [...(block.rows ?? [])];
+                  rows[rowIndex] = { ...row, sponsors: [...(row.sponsors ?? []), { name: "New Sponsor", logo: { src: "", alt: "" } }] };
+                  props.update({ ...block, rows });
+                }}>Add Sponsor to Row {rowIndex + 1}</button>
+              )}
+            </div>
+          ))}
+          {!props.disabledStructure && (
+            <button onClick={() => props.update({ ...block, rows: [...(block.rows ?? []), { sponsors: [] }] })}>Add Row</button>
+          )}
+        </>
       )}
 
       {!props.disabledStructure && (
@@ -2221,8 +2288,13 @@ function App() {
             )}
             {structureAllowed && (
               <div className="builderCard addBlock">
-                {(["hero", "richText", "cardGrid", "gallery", "eventList", "articleList", "cta", "fileList", "contactForm"] as BlockType[]).map((type) => (
-                  <button key={type} onClick={() => setPage({ ...page, blocks: [...page.blocks, { type, title: `New ${type}`, layoutColumn: currentPageLayout?.columns[0]?.id ?? "main" }] })}>Add {type}</button>
+                {(["hero", "richText", "cardGrid", "gallery", "eventList", "articleList", "cta", "fileList", "contactForm", "sponsorGrid"] as BlockType[]).map((type) => (
+                  <button key={type} onClick={() => {
+                    const newBlock: any = { type, title: `New ${type}`, layoutColumn: currentPageLayout?.columns[0]?.id ?? "main" };
+                    if (type === "sponsorGrid") newBlock.rows = [];
+                    if (type === "cardGrid") newBlock.cards = [];
+                    setPage({ ...page, blocks: [...page.blocks, newBlock] });
+                  }}>Add {type}</button>
                 ))}
               </div>
             )}
