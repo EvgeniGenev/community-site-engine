@@ -145,6 +145,9 @@ const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
           </Fragment>
         )}
       </a>
+      <button class="mobile-menu-toggle" aria-label="Toggle menu">
+        <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+      </button>
       <nav class="main-nav" aria-label="Main navigation">
         {navigation.items.map((item) => (
           <div class="nav-item">
@@ -187,6 +190,13 @@ const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
         </div>
       </div>
     </footer>
+    <script>
+      const toggle = document.querySelector('.mobile-menu-toggle');
+      const header = document.querySelector('.site-header');
+      if (toggle && header) {
+        toggle.addEventListener('click', () => header.classList.toggle('menu-open'));
+      }
+    </script>
   </body>
 </html>
 <!-- cache bust -->
