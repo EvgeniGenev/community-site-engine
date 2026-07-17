@@ -1,6 +1,7 @@
 node_modules/
 site-assets/
 site-assets-private-backup-*/
+site-assets-backup-pre-content-update/
 /scratch/
 /scripts/
 dist/
