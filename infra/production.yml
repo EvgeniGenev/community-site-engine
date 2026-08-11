@@ -501,7 +501,7 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPool
           COGNITO_REGION: !Ref AWS::Region
           COGNITO_APP_CLIENT_ID: !Ref UserPoolClient
-          ADMIN_ALLOWED_ORIGINS: !Sub https://${AdminDistribution.DomainName}
+          ADMIN_ALLOWED_ORIGINS: !Sub https://${AdminDistribution.DomainName},https://${SiteDistribution.DomainName},https://bhcaz.org,https://www.bhcaz.org
           CMS_ALLOW_DEV_TOKENS: "false"
           MAX_MEDIA_BYTES: "10485760"
           CODEBUILD_PROJECT_NAME: !Sub ${SiteName}-build-${AWS::Region}-${AWS::AccountId}

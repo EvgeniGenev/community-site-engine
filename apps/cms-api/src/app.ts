@@ -54,7 +54,15 @@ const allowedMediaTypes = new Map([
 
 function allowedCorsOrigin(origin: string) {
   if (!origin) return undefined;
-  return config.adminAllowedOrigins.includes(origin) ? origin : undefined;
+  if (config.adminAllowedOrigins.includes("*")) return origin;
+  if (config.adminAllowedOrigins.includes(origin)) return origin;
+  try {
+    const url = new URL(origin);
+    if (url.hostname === "bhcaz.org" || url.hostname.endsWith(".bhcaz.org")) {
+      return origin;
+    }
+  } catch {}
+  return undefined;
 }
 
 function storageKeyFromPath(pathValue: string) {
