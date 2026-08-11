@@ -593,7 +593,7 @@ const articleScripts: string[] = [];
       const empty = root.querySelector("[data-empty-events]");
       const today = new Date();
       const todayKey = dateKeyInTimeZone(today, timeZone);
-      let cursor = monthFromKey(events[0]?.dateKey || todayKey);
+      let cursor = monthFromKey(todayKey);
       const eventDates = new Set(events.map((event) => event.dateKey || event.startsAt.slice(0, 10)));
 
       function dateKeyInTimeZone(date, zone) {
