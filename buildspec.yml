@@ -32,7 +32,7 @@ phases:
       - npm run seed:media
   build:
     commands:
-      - PUBLIC_CMS_API_URL="${PUBLIC_CMS_API_URL}" npm run build:site
+      - PUBLIC_CMS_API_URL="${CMS_API_ENDPOINT}" npm run build:site
   post_build:
     commands:
       - aws s3 sync apps/site/dist "s3://${PUBLIC_SITE_BUCKET}" --delete
