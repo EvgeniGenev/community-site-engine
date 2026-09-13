@@ -295,7 +295,7 @@ h3 { font-size: clamp(1.25rem, 2vw, 1.65rem); }
   margin-top: 1.5rem;
 }
 
-.calendar-panel { padding: 1rem; position: sticky; top: 92px; }
+.calendar-panel { padding: 1rem; position: sticky; top: 92px; box-shadow: none; }
 .calendar-toolbar { display: grid; grid-template-columns: auto 1fr auto auto; gap: .5rem; align-items: center; margin-bottom: .8rem; }
 .calendar-toolbar button { padding: .55rem .7rem; font-size: .9rem; }
 .calendar-toolbar strong { text-align: center; }

@@ -1,7 +1,19 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
 import { FONT_OPTIONS, fontSupportsLanguages, type FontId } from "@community-site-engine/shared/fonts";
 import "./styles/app.css";
+
+interface LightboxData {
+  src: string;
+  alt?: string | undefined;
+  caption?: string | undefined;
+  onPrev?: (() => void) | undefined;
+  onNext?: (() => void) | undefined;
+  hasPrev?: boolean | undefined;
+  hasNext?: boolean | undefined;
+}
+
+const LightboxContext = createContext<(data: LightboxData | null) => void>(() => {});
 
 type Role = "admin" | "designer" | "contributor";
 type Collection = "pages" | "articles" | "events" | "navigation" | "settings" | "gallery" | "themes";
@@ -368,6 +380,16 @@ function apiBase() {
   return import.meta.env.VITE_CMS_API_URL ?? "http://localhost:8787";
 }
 
+function resolveMediaUrl(src?: string): string {
+  if (!src) return "";
+  if (/^(?:https?:)?\/\//i.test(src) || src.startsWith("data:") || src.startsWith("blob:")) {
+    return src;
+  }
+  const base = apiBase().replace(/\/$/, "");
+  const path = src.startsWith("/") ? src : `/${src}`;
+  return `${base}${path}`;
+}
+
 function cognitoConfig() {
   const domain = import.meta.env.VITE_COGNITO_DOMAIN as string | undefined;
   const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID as string | undefined;
@@ -721,6 +743,7 @@ function moveBlock(blocks: PageBlock[], fromIndex: number, toIndex: number, layo
 }
 
 function ImageField(props: { label: string; value: MediaRef | undefined; onChange: (value: MediaRef | undefined) => void; onUpload: (folder: MediaFolder) => Promise<MediaRef | null>; folder: MediaFolder }) {
+  const setLightbox = useContext(LightboxContext);
   return (
     <div className="imageField">
       <div>
@@ -729,7 +752,17 @@ function ImageField(props: { label: string; value: MediaRef | undefined; onChang
         <TextField label="Alt text" value={props.value?.alt} onChange={(alt) => props.onChange(props.value?.src ? { ...props.value, alt } : undefined)} />
       </div>
       <div className="imagePreview">
-        {props.value?.src ? <img src={props.value.src} alt={props.value.alt} /> : <span>No image</span>}
+        {props.value?.src ? (
+          <img
+            src={resolveMediaUrl(props.value.src)}
+            alt={props.value.alt}
+            referrerPolicy="no-referrer"
+            title="Click to view full image"
+            onClick={() => setLightbox({ src: props.value!.src, alt: props.value?.alt })}
+          />
+        ) : (
+          <span>No image</span>
+        )}
         <button type="button" onClick={async () => {
           const media = await props.onUpload(props.folder);
           if (media) props.onChange(media);
@@ -1066,11 +1099,47 @@ function TranslationsEditor(props: { token: string; onUpdate: () => void }) {
 }
 
 function App() {
+  const [lightboxImage, setLightboxImage] = useState<LightboxData | null>(null);
   const [token, setToken] = useState(localStorage.getItem("community-site-engine-token") ?? (import.meta.env.DEV ? "dev-admin-token" : ""));
   const [user, setUser] = useState<UserInfo | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("pages");
   const [locale, setLocale] = useState("en");
+
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setLightboxImage(null);
+      } else if (e.key === "ArrowLeft" && lightboxImage.hasPrev && lightboxImage.onPrev) {
+        lightboxImage.onPrev();
+      } else if (e.key === "ArrowRight" && lightboxImage.hasNext && lightboxImage.onNext) {
+        lightboxImage.onNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxImage]);
+
+  useEffect(() => {
+    const handleGlobalImageClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target || target.tagName !== "IMG") return;
+      if (target.closest(".adminLightboxOverlay")) return;
+      const src = target.getAttribute("src");
+      if (!src) return;
+      const alt = target.getAttribute("alt") ?? "";
+      const caption = target.getAttribute("title") || target.getAttribute("data-caption") || "";
+      const cleanCaption = caption === "Click to view full image" ? "" : caption;
+      setLightboxImage({
+        src,
+        alt: alt === "Click to view full image" ? "" : alt,
+        caption: cleanCaption
+      });
+    };
+    document.addEventListener("click", handleGlobalImageClick);
+    return () => document.removeEventListener("click", handleGlobalImageClick);
+  }, []);
   const [message, setMessage] = useState("");
   const [pages, setPages] = useState<CmsObject<Page>[]>([]);
   const [events, setEvents] = useState<CmsObject<EventItem>[]>([]);
@@ -2096,7 +2165,8 @@ function App() {
   }
 
   return (
-    <main className="shell">
+    <LightboxContext.Provider value={setLightboxImage}>
+      <main className="shell">
       <aside className="sidebar">
         <p className="kicker">Community Site Engine</p>
         <h1>Content Builder</h1>
@@ -2573,61 +2643,86 @@ function App() {
                   </div>
 
                   <div className="galleryManager">
-                    {albumDraft.items.map((item, index) => (
+                    {albumDraft.items.map((item, index) => {
+                      const openGalleryLightbox = (idx: number) => {
+                        if (!albumDraft || !albumDraft.items[idx]) return;
+                        const current = albumDraft.items[idx];
+                        setLightboxImage({
+                          src: current.src,
+                          alt: mediaText(current, "alt"),
+                          caption: mediaText(current, "caption"),
+                          hasPrev: idx > 0,
+                          hasNext: idx < albumDraft.items.length - 1,
+                          onPrev: idx > 0 ? () => openGalleryLightbox(idx - 1) : undefined,
+                          onNext: idx < albumDraft.items.length - 1 ? () => openGalleryLightbox(idx + 1) : undefined
+                        });
+                      };
+
+                      return (
                       <figure className="galleryItem" key={`${item.src}-${index}`}>
-                        <img src={item.src} alt={mediaText(item, "alt")} />
-                        <label className="field">
-                          <span>Status</span>
-                          <select value={item.status ?? "published"} onChange={(e) => {
+                        <div className="galleryItemMedia">
+                          <img
+                            src={resolveMediaUrl(item.src)}
+                            alt={mediaText(item, "alt")}
+                            referrerPolicy="no-referrer"
+                            title="Click to view full image"
+                            onClick={() => openGalleryLightbox(index)}
+                          />
+                        </div>
+                        <div className="galleryItemDetails">
+                          <label className="field">
+                            <span>Status</span>
+                            <select value={item.status ?? "published"} onChange={(e) => {
+                              const items = [...albumDraft.items];
+                              items[index] = { ...item, status: e.target.value as MediaRef["status"] };
+                              setAlbumDraft({ ...albumDraft, items });
+                            }}>
+                              <option value="published">Published</option>
+                              <option value="draft">Draft</option>
+                            </select>
+                          </label>
+                          <TextField label="Alt text" value={mediaText(item, "alt")} onChange={(alt) => {
                             const items = [...albumDraft.items];
-                            items[index] = { ...item, status: e.target.value as MediaRef["status"] };
+                            items[index] = withMediaText(item, "alt", alt);
                             setAlbumDraft({ ...albumDraft, items });
-                          }}>
-                            <option value="published">Published</option>
-                            <option value="draft">Draft</option>
-                          </select>
-                        </label>
-                        <TextField label="Alt text" value={mediaText(item, "alt")} onChange={(alt) => {
-                          const items = [...albumDraft.items];
-                          items[index] = withMediaText(item, "alt", alt);
-                          setAlbumDraft({ ...albumDraft, items });
-                        }} />
-                        <TextField label="Caption" value={mediaText(item, "caption")} onChange={(caption) => {
-                          const items = [...albumDraft.items];
-                          items[index] = withMediaText(item, "caption", caption);
-                          setAlbumDraft({ ...albumDraft, items });
-                        }} />
-                        <label className="field">
-                          <span>Move to gallery</span>
-                          <select value="" onChange={async (e) => {
-                            const targetKey = e.target.value;
-                            if (!targetKey || !albumDraft) return;
-                            const targetAlbum = (albums.find((a) => a.key === targetKey)?.data) as GalleryAlbum | undefined;
-                            if (!targetAlbum) return;
-                            if (!confirm(`Move this image to "${targetAlbum.title}"?`)) return;
-                            // Remove from current album
-                            const updatedCurrent = { ...albumDraft, items: albumDraft.items.filter((_, i) => i !== index) };
-                            // Add to target album
-                            const updatedTarget = { ...targetAlbum, items: [...targetAlbum.items, item] };
-                            await saveAlbum(updatedCurrent);
-                            await saveAlbum(updatedTarget);
-                            setAlbumDraft(updatedCurrent);
-                          }}>
-                            <option value="">Keep here</option>
-                            {albums.filter((a) => a.key !== selectedAlbumKey).map((a) => (
-                              <option key={a.key} value={a.key}>{(a.data as GalleryAlbum).title}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <button className="danger small" onClick={async () => {
-                          if (!confirm("Remove this image? Uploaded media files will also be deleted from storage.")) return;
-                          if (item.src.startsWith("/media/")) await deleteMediaFromStorage(item.src);
-                          const updated = { ...albumDraft, items: albumDraft.items.filter((_, i) => i !== index) };
-                          setAlbumDraft(updated);
-                          await saveAlbum(updated);
-                        }}>Remove Image</button>
+                          }} />
+                          <TextField label="Caption" value={mediaText(item, "caption")} onChange={(caption) => {
+                            const items = [...albumDraft.items];
+                            items[index] = withMediaText(item, "caption", caption);
+                            setAlbumDraft({ ...albumDraft, items });
+                          }} />
+                          <label className="field">
+                            <span>Move to gallery</span>
+                            <select value="" onChange={async (e) => {
+                              const targetKey = e.target.value;
+                              if (!targetKey || !albumDraft) return;
+                              const targetAlbum = (albums.find((a) => a.key === targetKey)?.data) as GalleryAlbum | undefined;
+                              if (!targetAlbum) return;
+                              if (!confirm(`Move this image to "${targetAlbum.title}"?`)) return;
+                              // Remove from current album
+                              const updatedCurrent = { ...albumDraft, items: albumDraft.items.filter((_, i) => i !== index) };
+                              // Add to target album
+                              const updatedTarget = { ...targetAlbum, items: [...targetAlbum.items, item] };
+                              await saveAlbum(updatedCurrent);
+                              await saveAlbum(updatedTarget);
+                              setAlbumDraft(updatedCurrent);
+                            }}>
+                              <option value="">Keep here</option>
+                              {albums.filter((a) => a.key !== selectedAlbumKey).map((a) => (
+                                <option key={a.key} value={a.key}>{(a.data as GalleryAlbum).title}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <button className="danger small" onClick={async () => {
+                            if (!confirm("Remove this image? Uploaded media files will also be deleted from storage.")) return;
+                            if (item.src.startsWith("/media/")) await deleteMediaFromStorage(item.src);
+                            const updated = { ...albumDraft, items: albumDraft.items.filter((_, i) => i !== index) };
+                            setAlbumDraft(updated);
+                            await saveAlbum(updated);
+                          }}>Remove Image</button>
+                        </div>
                       </figure>
-                    ))}
+                    ); })}
                     {albumDraft.items.length === 0 && (
                       <p className="muted" style={{gridColumn:"1/-1",textAlign:"center",padding:"2rem"}}>No images yet. Click "Upload Image" to add some.</p>
                     )}
@@ -3259,7 +3354,59 @@ function App() {
         )}
       </section>
       )}
-    </main>
+      </main>
+
+      {lightboxImage && (
+        <div
+          className="adminLightboxOverlay"
+          onClick={() => setLightboxImage(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
+          <div className="adminLightboxContent" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="adminLightboxClose"
+              aria-label="Close image preview"
+              onClick={() => setLightboxImage(null)}
+            >
+              ✕
+            </button>
+            {lightboxImage.hasPrev && lightboxImage.onPrev && (
+              <button
+                type="button"
+                className="adminLightboxNavBtn adminLightboxPrev"
+                aria-label="Previous image"
+                onClick={lightboxImage.onPrev}
+              >
+                ‹
+              </button>
+            )}
+            {lightboxImage.hasNext && lightboxImage.onNext && (
+              <button
+                type="button"
+                className="adminLightboxNavBtn adminLightboxNext"
+                aria-label="Next image"
+                onClick={lightboxImage.onNext}
+              >
+                ›
+              </button>
+            )}
+            <img
+              src={resolveMediaUrl(lightboxImage.src)}
+              alt={lightboxImage.alt ?? ""}
+              referrerPolicy="no-referrer"
+            />
+            {(lightboxImage.caption || lightboxImage.alt) && (
+              <p className="adminLightboxCaption">
+                {lightboxImage.caption || lightboxImage.alt}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </LightboxContext.Provider>
   );
 }
 

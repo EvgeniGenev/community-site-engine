@@ -30,7 +30,8 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { CodeBuildClient, StartBuildCommand, type EnvironmentVariable } from "@aws-sdk/client-codebuild";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import mime from "mime";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
@@ -922,6 +923,32 @@ export async function importFacebookEvent(url: string, timeZone: string): Promis
   }
 
   const slug = slugifyImport(title);
+  let finalImageSrc = imageSrc;
+  if (imageSrc && /^https?:\/\//i.test(imageSrc)) {
+    try {
+      const imgRes = await fetch(imageSrc, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+      if (imgRes.ok) {
+        const bytes = new Uint8Array(await imgRes.arrayBuffer());
+        const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+        const ext = contentType.includes("png") ? ".png" : contentType.includes("webp") ? ".webp" : ".jpg";
+        const key = `media/events/${Date.now()}-${slug}${ext}`;
+        await storage.putBytes(key, bytes, contentType);
+        if (config.storageMode === "local") {
+          const publicPath = resolve(process.cwd(), "../../apps/site/public", key);
+          await mkdir(dirname(publicPath), { recursive: true });
+          await writeFile(publicPath, bytes);
+        }
+        finalImageSrc = `/${key}`;
+      }
+    } catch (e) {
+      console.error("Failed to download Facebook event image:", e);
+    }
+  }
+
   return EventSchema.parse({
     id: slug,
     status: "draft",
@@ -931,7 +958,7 @@ export async function importFacebookEvent(url: string, timeZone: string): Promis
     endsAt,
     locationName,
     address: locationText,
-    image: imageSrc ? { src: imageSrc, alt: title } : undefined,
+    image: finalImageSrc ? { src: finalImageSrc, alt: title } : undefined,
     description: description || `Imported from Facebook: ${initialUrl.toString()}`,
     notes: notes.join("\n")
   });
@@ -1333,6 +1360,40 @@ app.post("/contact", async (c) => {
     console.error("[contact] SES send failed:", error);
     return c.json({ ok: false, message: "Failed to send message. Please try again later." }, 502);
   }
+});
+
+app.get("/media/*", async (c) => {
+  const rawPath = c.req.path.replace(/^\/+/, "");
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(rawPath);
+  } catch {
+    decoded = rawPath;
+  }
+  if (decoded.includes("..") || !decoded.startsWith("media/")) {
+    throw new HTTPException(400, { message: "Invalid media path" });
+  }
+  let bytes = await storage.getBytes(decoded);
+  if (!bytes && config.storageMode === "local") {
+    try {
+      const fallbackPath = resolve(process.cwd(), "../../apps/site/public", decoded);
+      bytes = await readFile(fallbackPath);
+    } catch {
+      // not found
+    }
+  }
+  if (!bytes) {
+    throw new HTTPException(404, { message: "Media not found" });
+  }
+  const contentType = mime.getType(decoded) ?? "application/octet-stream";
+  return new Response(bytes as BodyInit, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=86400",
+      "Access-Control-Allow-Origin": "*"
+    }
+  });
 });
 
 app.use("/api/*", async (c, next) => {

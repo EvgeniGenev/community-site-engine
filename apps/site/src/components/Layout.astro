@@ -38,6 +38,38 @@ const fontCss = `
     --font-cta: ${fontStack(fonts.cta ?? fonts.default)};
     ${fonts.ctaSize ? `--font-size-cta: ${fonts.ctaSize};` : ""}
   }
+  body {
+    font-family: var(--font-page, var(--font-default, Georgia, "Times New Roman", serif));
+    ${fonts.pageSize || fonts.defaultSize ? `font-size: var(--font-size-page, var(--font-size-default, 16px));` : ""}
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading, var(--font-default, Georgia, "Times New Roman", serif));
+  }
+  ${fonts.headingsSize ? `h1, h2, h3 { font-size: var(--font-size-heading); }` : ""}
+  .brand-copy, .brand-text, .brand-tagline, .main-nav, .language-switcher {
+    font-family: var(--font-navigation, var(--font-default, system-ui, sans-serif));
+  }
+  ${fonts.navigationSize ? `.nav-item > a, .language { font-size: var(--font-size-navigation); }` : ""}
+  .card {
+    font-family: var(--font-card, var(--font-default, system-ui, sans-serif));
+    ${fonts.cardSize ? `font-size: var(--font-size-card);` : ""}
+  }
+  .card.article, .prose {
+    font-family: var(--font-article, var(--font-default, Georgia, "Times New Roman", serif));
+    ${fonts.articleSize ? `font-size: var(--font-size-article);` : ""}
+  }
+  .gallery-grid figure {
+    font-family: var(--font-gallery, var(--font-default, system-ui, sans-serif));
+  }
+  ${fonts.gallerySize ? `.gallery-grid figcaption { font-size: var(--font-size-gallery); }` : ""}
+  .event-card {
+    font-family: var(--font-event, var(--font-default, system-ui, sans-serif));
+    ${fonts.eventSize ? `font-size: var(--font-size-event);` : ""}
+  }
+  .cta {
+    font-family: var(--font-cta, var(--font-default, system-ui, sans-serif));
+    ${fonts.ctaSize ? `font-size: var(--font-size-cta);` : ""}
+  }
 `;
 const switcherItems = languages.map((language) => {
   const translatedPage = language.code === page.locale ? page : translations.find((item) => item.locale === language.code);
@@ -128,7 +160,8 @@ const cmsApiUrl = import.meta.env.PUBLIC_CMS_API_URL ?? "http://localhost:8787";
     {stylesheets.map((stylesheet) => (
       stylesheet.css.trim() && <style data-cms-css={stylesheet.key} set:html={stylesheet.css} />
     ))}
-    <style is:inline set:html={fontCss + maxCss + calendarCss + themeCss + navVarsCss + compVarsCss}></style>
+    <style data-cms-fonts is:inline set:html={fontCss}></style>
+    <style is:inline set:html={maxCss + calendarCss + themeCss + navVarsCss + compVarsCss}></style>
   </head>
   <body>
     <header class="site-header">

@@ -592,3 +592,5 @@ export function pagePath(locale: Locale, slug: string): string {
   const pathSlug = slug ? `${slug}/` : "";
   return locale === "en" ? `/${pathSlug}` : `/${locale}/${pathSlug}`;
 }
+
+export { escapeHtml, escapeAttribute, splitTrailingPunctuation, linkifyHtml, autolinkMarkdownHtml } from "./links.js";

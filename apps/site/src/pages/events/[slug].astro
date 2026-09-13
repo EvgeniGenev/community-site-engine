@@ -1,4 +1,5 @@
 ---
+import { linkifyHtml } from "@community-site-engine/shared";
 import Layout from "../../components/Layout.astro";
 import { getLocalizedEvents, getNavigation, getSettings } from "../../content";
 
@@ -49,8 +50,8 @@ const fakePage = {
       {event.address && ` · ${event.address}`}
     </p>
     <div class="event-detail-body">
-      <p>{event.description}</p>
-      {event.notes && <p><strong>Note:</strong> {event.notes}</p>}
+      <p set:html={linkifyHtml(event.description)} />
+      {event.notes && <p><strong>Note:</strong> <Fragment set:html={linkifyHtml(event.notes)} /></p>}
     </div>
     <a href="/events/" class="button primary event-back-link">← Back to Events</a>
   </div>
@@ -85,6 +86,15 @@ const fakePage = {
     color: var(--muted);
     margin-bottom: 16px;
     white-space: pre-wrap;
+  }
+  .event-detail-body :global(a) {
+    color: var(--red);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    word-break: break-word;
+  }
+  .event-detail-body :global(a:hover) {
+    color: var(--red-dark);
   }
   .event-back-link {
     display: inline-flex;

@@ -11,7 +11,7 @@ export const config = {
   cognitoRegion: process.env.COGNITO_REGION,
   cognitoAppClientId: process.env.COGNITO_APP_CLIENT_ID,
   allowDevTokens: process.env.CMS_ALLOW_DEV_TOKENS === "true",
-  adminAllowedOrigins: (process.env.ADMIN_ALLOWED_ORIGINS ?? "http://localhost:5174,http://127.0.0.1:5174")
+  adminAllowedOrigins: (process.env.ADMIN_ALLOWED_ORIGINS ?? "http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),

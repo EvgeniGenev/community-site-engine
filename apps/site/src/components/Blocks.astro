@@ -1,5 +1,5 @@
 ---
-import type { Article, Event, MediaRef, PageBlock, PageLayout } from "@community-site-engine/shared";
+import { autolinkMarkdownHtml, linkifyHtml, type Article, type Event, type MediaRef, type PageBlock, type PageLayout } from "@community-site-engine/shared";
 
 interface Props {
   blocks: PageBlock[];
@@ -40,7 +40,7 @@ function safeMarkdownHref(value: string) {
 }
 
 function inlineMarkdown(value: string) {
-  return value
+  const rendered = value
     .replace(/&(?![a-zA-Z0-9#]+;)/g, "&amp;")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
@@ -48,6 +48,7 @@ function inlineMarkdown(value: string) {
       const safeHref = safeMarkdownHref(href);
       return safeHref ? `<a href="${escapeAttribute(safeHref)}">${label}</a>` : label;
     });
+  return autolinkMarkdownHtml(rendered);
 }
 
 function markdownToHtml(body?: string) {
@@ -399,7 +400,7 @@ const articleScripts: string[] = [];
                   <span class="file-label">{item.label}</span>
                   <span class="file-ext">{ext}</span>
                 </a>
-                {item.description && <p class="file-description">{item.description}</p>}
+                {item.description && <p class="file-description" set:html={linkifyHtml(item.description)} />}
               </li>
             );
           })}
